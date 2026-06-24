@@ -72,6 +72,8 @@ export class Game {
   private tutorialTimer = 0;
   private tutorialStep2Phase: 0 | 1 | 2 = 0; // attract-lesson sub-state
   private tutorialPhaseTimer = 0; // timer within an attract sub-phase
+  private tutorialLvl2Seen = false;
+  private tutorialLvl2Timer = 0;
 
   constructor(canvas: HTMLCanvasElement, uiRoot: HTMLElement) {
     this.system = new CpuParticleSystem(this.device.capacity);
@@ -311,17 +313,26 @@ export class Game {
         this.gameHud.update();
 
         if (!this.save.data.firstPlayDone) {
-          // Tutorial: lock down playfield + specials; player spawns the first particle themselves
-          this.specials.setEnabled(false);
-          this.playfield.setEnabled(false);
-          this.tutorialStep = 0;
-          this.tutorialTimer = 0;
-          this.tutorialStep2Phase = 0;
-          this.input.burstSize = 1; // one particle per tap so the lesson lands
-          this.gameHud.setReveal(0); // start with counter only
-          this.hud.setTutorialTools(["spawn"]); // only Spawn visible at start
-          this.hud.setStatsVisible(false); // hide fps/count readout during tutorial
-          this.coach.show("Tap the screen ✦");
+          if (this.save.data.level >= 2) {
+            // Player already has gameplay progress (e.g. reload mid-tutorial) — skip ahead
+            this.save.data.firstPlayDone = true;
+            this.save.persist();
+          } else {
+            // Tutorial: lock down playfield + specials; player spawns the first particle themselves
+            this.specials.setEnabled(false);
+            this.playfield.setEnabled(false);
+            this.tutorialStep = 0;
+            this.tutorialTimer = 0;
+            this.tutorialStep2Phase = 0;
+            this.tutorialPhaseTimer = 0;
+            this.tutorialLvl2Seen = false;
+            this.tutorialLvl2Timer = 0;
+            this.input.burstSize = 1; // one particle per tap so the lesson lands
+            this.gameHud.setReveal(0); // start with counter only
+            this.hud.setTutorialTools(["spawn"]); // only Spawn visible at start
+            this.hud.setStatsVisible(false); // hide fps/count readout during tutorial
+            this.coach.show("Tap the screen ✦");
+          }
         }
         this.hud.updateUnlocks(this.save.data.level);
         break;
@@ -348,6 +359,22 @@ export class Game {
     }
   }
 
+  /** True if any live particle is inside the radius of an active force point. */
+  private particleNearForce(): boolean {
+    const forces = this.input.getForces();
+    if (forces.length === 0) return false;
+    const { px, py, count } = this.system;
+    for (const f of forces) {
+      const r2 = f.radius * f.radius;
+      for (let i = 0; i < count; i++) {
+        const dx = px[i] - f.x;
+        const dy = py[i] - f.y;
+        if (dx * dx + dy * dy < r2) return true;
+      }
+    }
+    return false;
+  }
+
   /** Tutorial script that runs during the first game session (until firstPlayDone is set). */
   private tutorialUpdate(dt: number): void {
     this.tutorialTimer += dt;
@@ -371,7 +398,7 @@ export class Game {
         }
         break;
 
-      case 2: { // attract lesson — player taps attract, holds, then auto-advances
+      case 2: { // attract lesson — player taps attract, holds near particles, then auto-advances
         this.tutorialPhaseTimer += dt;
         if (this.tutorialStep2Phase === 0 && this.input.tool === "attract") {
           // player selected attract — remove highlight, prompt to hold
@@ -379,30 +406,43 @@ export class Game {
           this.tutorialPhaseTimer = 0;
           this.hud.highlightTool(null);
           this.coach.show("Hold the screen — pull them close ◉");
-        } else if (this.tutorialStep2Phase === 1 && this.input.getForces().length > 0) {
-          // player is holding — start counting hold time
+        } else if (this.tutorialStep2Phase === 1 && this.input.getForces().length > 0 && this.particleNearForce()) {
+          // only advance once a particle is actually inside the attract radius
           this.tutorialStep2Phase = 2;
           this.tutorialPhaseTimer = 0;
         } else if (this.tutorialStep2Phase === 2 &&
                    (this.input.getForces().length === 0 || this.tutorialPhaseTimer >= 3)) {
-          // player released or held long enough — advance
+          // player released or held long enough — spawn more particles and advance
           this.hud.highlightTool(null);
           this.tutorialStep2Phase = 0;
+          const [w2, h2] = [window.innerWidth, window.innerHeight];
+          this.system.spawnBurst(w2 / 2, h2 / 2, { count: 20, speed: 200, speedJitter: 120 });
           this.advanceTutorial(3);
-          this.coach.show("Stir them — every move scores ✦");
+          this.coach.show("Particles score — movement earns more ✦");
         }
-        // timeout fallback: if stuck, push forward
+        // timeout fallback: if stuck (e.g. no particles near hold point), push forward
         if (this.tutorialStep === 2 && this.tutorialTimer > 50) {
           this.hud.highlightTool(null);
           this.tutorialStep2Phase = 0;
+          const [wt, ht] = [window.innerWidth, window.innerHeight];
+          this.system.spawnBurst(wt / 2, ht / 2, { count: 20, speed: 200, speedJitter: 120 });
           this.advanceTutorial(3);
-          this.coach.show("Stir them — every move scores ✦");
+          this.coach.show("Particles score — movement earns more ✦");
         }
         break;
       }
 
-      case 3: // move-to-earn lesson; introduce obstacle once player reaches level 2
-        if (this.state.level >= 2 || this.tutorialTimer > 45) {
+      case 3: { // move-to-earn lesson; wait for level 2, then reveal obstacle
+        // first time level 2 is reached: flash a message and spawn a burst to make it tangible
+        if (!this.tutorialLvl2Seen && this.state.level >= 2) {
+          this.tutorialLvl2Seen = true;
+          this.tutorialLvl2Timer = 0;
+          this.coach.show("Level 2 — your swarm can grow ✦");
+          const [wl, hl] = [window.innerWidth, window.innerHeight];
+          this.system.spawnBurst(wl / 2, hl / 2, { count: 15, speed: 220, speedJitter: 130 });
+        }
+        if (this.tutorialLvl2Seen) this.tutorialLvl2Timer += dt;
+        if ((this.tutorialLvl2Seen && this.tutorialLvl2Timer >= 3) || this.tutorialTimer > 48) {
           this.advanceTutorial(4);
           this.gameHud.setReveal(2); // show energy + points now that they've earned a level
           this.playfield.setTutorial(true); // one static obstacle only — no portals/targets yet
@@ -410,6 +450,7 @@ export class Game {
           this.coach.setVisible(false); // let the obstacle speak for itself
         }
         break;
+      }
 
       case 4: // obstacle discovery phase, then hand off to the real game
         if (this.tutorialTimer > 30) {
