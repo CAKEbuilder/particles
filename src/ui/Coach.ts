@@ -19,7 +19,13 @@ export class Coach {
 
   show(text: string, button?: { label: string; onClick: () => void }): void {
     this.el.classList.remove("hidden-ui");
-    this.msg.textContent = text;
+    if (this.msg.textContent !== text) {
+      this.msg.textContent = text;
+      // re-trigger the entrance animation so each new message gracefully fades/slides in
+      this.msg.classList.remove("coach-anim");
+      void this.msg.offsetWidth; // force reflow
+      this.msg.classList.add("coach-anim");
+    }
     if (button) {
       this.btn.classList.remove("hidden-ui");
       this.btn.textContent = button.label;

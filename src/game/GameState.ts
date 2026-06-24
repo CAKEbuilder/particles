@@ -60,6 +60,13 @@ export class GameState {
       this.ascensionMult
     );
   }
+  /** Per-particle points/sec including the movement bonus (a still swarm earns the base;
+   *  a fully-stirred one earns up to base*(1+movementBonus)). Drives both economy + HUD readout. */
+  pointRate(avgSpeed: number): number {
+    const g = config.game;
+    const motion = Math.min(1, avgSpeed / g.movementRefSpeed);
+    return g.pointRatePerParticle * (1 + g.movementBonus * motion) * this.pointMult;
+  }
   get ascensionMult(): number {
     return 1 + this.save.data.ascension * config.game.ascendBonus;
   }
@@ -133,10 +140,10 @@ export class GameState {
   }
 
   /** Per-frame: regen energy, accrue points from live particles, handle level-ups. */
-  update(dt: number, liveCount: number): void {
+  update(dt: number, liveCount: number, avgSpeed = 0): void {
     this.energy = Math.min(this.energyMax, this.energy + this.energyRegen * dt);
 
-    const gained = liveCount * config.game.pointRatePerParticle * this.pointMult * dt;
+    const gained = liveCount * this.pointRate(avgSpeed) * dt;
     if (gained > 0) {
       this.save.data.points += gained;
       this.save.data.totalPoints += gained;

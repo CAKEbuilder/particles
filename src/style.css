@@ -632,9 +632,9 @@ body {
 .target-glyph {
   position: absolute;
   transform: translate(-50%, -50%);
-  font-size: 24px;
+  font-size: 15px;
   color: #fff;
-  text-shadow: 0 0 12px rgba(120, 200, 255, 0.9);
+  text-shadow: 0 0 10px rgba(120, 200, 255, 0.9);
 }
 .target-hp {
   position: absolute;
@@ -716,6 +716,12 @@ body {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.8);
+}
+.coach-msg.coach-anim { animation: coach-in 0.45s cubic-bezier(0.2, 0.9, 0.2, 1); }
+@keyframes coach-in {
+  0%   { opacity: 0; transform: translateY(-10px) scale(0.96); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 .coach-btn { pointer-events: auto; }
 

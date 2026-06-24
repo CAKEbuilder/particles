@@ -214,7 +214,7 @@ export class GameHud {
     this.swarmCount.classList.add("count-pop");
   }
 
-  update(liveCount = 0): void {
+  update(liveCount = 0, avgSpeed = 0): void {
     const cap = this.state.maxCapacity;
     const displayCount = formatCount(liveCount) + " / " + formatCount(cap);
     if (this.swarmCount.textContent !== displayCount) {
@@ -224,7 +224,7 @@ export class GameHud {
       this.lastDisplayedCount = liveCount;
     }
 
-    const rate = liveCount * config.game.pointRatePerParticle * this.state.pointMult;
+    const rate = liveCount * this.state.pointRate(avgSpeed);
     this.heroPps.querySelector(".hero-pps-val")!.textContent = `+${rate.toFixed(0)}`;
     this.pointsEl.textContent = Math.floor(this.state.points).toLocaleString();
     this.levelEl.textContent = String(this.state.level);

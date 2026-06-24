@@ -146,7 +146,7 @@ export class Playfield {
     el.style.top = `${y}px`;
     el.style.setProperty("--r", `${r * 2}px`);
     el.innerHTML =
-      `<div class="target-shape"></div><div class="target-glyph">⚡</div>` +
+      `<div class="target-shape"></div><div class="target-glyph">✦</div>` +
       `<div class="target-hp"><div class="target-hp-fill"></div></div>`;
     this.parent.appendChild(el);
     const hpEl = el.querySelector(".target-hp-fill") as HTMLDivElement;

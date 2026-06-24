@@ -378,7 +378,7 @@ export class Game {
         if (attracted || this.tutorialTimer > 40) {
           this.tutorialStep2Phase = 0;
           this.advanceTutorial(3);
-          this.coach.show("Watch the XP bar — it fills as particles float ✦");
+          this.coach.show("Keep them moving to earn faster — watch the XP bar climb ✦");
         }
         break;
       }
@@ -458,7 +458,7 @@ export class Game {
     this.input.update(dt);
 
     if (this.mode === "game") {
-      this.state.update(dt, this.system.count);
+      this.state.update(dt, this.system.count, this.system.avgSpeed);
     }
     if (this.mode === "game" || this.mode === "intro") {
       this.powerups.update(dt);
@@ -506,7 +506,7 @@ export class Game {
     if (this.mode !== "collection" && this.mode !== "progress") {
       this.hud.update(this.loop.fps, this.system.count);
     }
-    if (this.mode === "game") this.gameHud.update(this.system.count);
+    if (this.mode === "game") this.gameHud.update(this.system.count, this.system.avgSpeed);
     perf.countSubsteps(this.loop.lastSubSteps);
     perf.tick(this.loop.fps, this.system.count);
     this.governQuality();

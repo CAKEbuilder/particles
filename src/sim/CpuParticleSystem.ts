@@ -28,6 +28,7 @@ export class CpuParticleSystem implements ParticleSystem {
   hueHi = 1;
   spawnRainbow = false; // while true, new spawns are full-spectrum rainbow
 
+  avgSpeed = 0; // mean particle speed (px/s) over the last step; drives the movement-points bonus
   private w = 1;
   private h = 1;
   private forcePoints: ForcePoint[] = [];
@@ -157,6 +158,7 @@ export class CpuParticleSystem implements ParticleSystem {
 
     // integrate + cosmetics
     perf.begin("integrate");
+    let sumSpeed = 0;
     for (let i = 0; i < n; i++) {
       let ax = gxv;
       let ay = gyv;
@@ -177,6 +179,7 @@ export class CpuParticleSystem implements ParticleSystem {
       // hue: rainbow particles span the full spectrum; others map the spatial gradient
       // into the unlocked colour band [hueLo, hueHi].
       const speed = Math.sqrt(nvx * nvx + nvy * nvy);
+      sumSpeed += speed;
       if (rainbow[i]) {
         let hr = rainbowPhase + (px[i] + py[i]) * 0.0026;
         hr -= Math.floor(hr);
@@ -191,6 +194,7 @@ export class CpuParticleSystem implements ParticleSystem {
       angle[i] = a;
       alpha[i] = 0.55 + Math.min(0.55, speed * 0.0016);
     }
+    this.avgSpeed = sumSpeed / n;
     perf.end("integrate");
 
     // walls
