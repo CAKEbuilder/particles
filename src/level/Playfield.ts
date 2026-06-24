@@ -35,12 +35,18 @@ const OBSTACLE_RESTITUTION = 0.7;
 
 // timing windows (seconds)
 const OBSTACLE_CHANGE = [20, 32] as const;
-const PORTAL_FIRST = 18;
+const PORTAL_FIRST = 60;          // countdown starts only after level/count gate is met
 const PORTAL_ON = [22, 30] as const;
 const PORTAL_OFF = [16, 28] as const;
-const TARGET_FIRST = 22;
+const TARGET_FIRST = 90;          // buff targets come later still
 const TARGET_EVERY = [28, 46] as const;
 const TARGET_LIFE = 16;
+
+// minimum thresholds before portals / buff targets can appear
+const PORTAL_MIN_LEVEL = 3;
+const PORTAL_MIN_COUNT = 300;
+const TARGET_MIN_LEVEL = 5;
+const TARGET_MIN_COUNT = 500;
 
 const rand = (a: number, b: number): number => a + Math.random() * (b - a);
 
@@ -50,6 +56,7 @@ export class Playfield {
   private targets: Target[] = [];
   private enabled = false;
   private tutorial = false; // tutorial mode: one static obstacle only — no portals, targets, or reshaping
+  private levelGate = false; // when true, portal/target timers only count down once level/count thresholds are met
 
   private obstacleTimer = 0;
   private portalTimer = 0;
@@ -76,6 +83,7 @@ export class Playfield {
   setTutorial(on: boolean): void {
     this.tutorial = on;
     if (!on) {
+      this.levelGate = true; // gate portals/targets by level for the rest of this session
       this.portalTimer = PORTAL_FIRST;
       this.targetTimer = TARGET_FIRST;
       this.obstacleTimer = rand(...OBSTACLE_CHANGE);
@@ -166,7 +174,7 @@ export class Playfield {
   }
 
   /** Advance object lifecycles + apply interactions. Game mode only. */
-  update(dt: number): void {
+  update(dt: number, level = 1, count = 0): void {
     if (!this.enabled) return;
     const w = window.innerWidth;
     const h = window.innerHeight;
@@ -180,26 +188,32 @@ export class Playfield {
         this.obstacleTimer = rand(...OBSTACLE_CHANGE);
       }
 
-      // portals cycle on/off
-      this.portalTimer -= dt;
-      if (this.portalTimer <= 0) {
-        if (this.portalOn) {
-          this.portal?.el.remove();
-          this.portal = null;
-          this.portalOn = false;
-          this.portalTimer = rand(...PORTAL_OFF);
-        } else {
-          this.spawnPortal();
-          this.portalOn = true;
-          this.portalTimer = rand(...PORTAL_ON);
+      // portals cycle on/off — only count down once the player has a real swarm
+      const portalReady = !this.levelGate || level >= PORTAL_MIN_LEVEL || count >= PORTAL_MIN_COUNT;
+      if (portalReady) {
+        this.portalTimer -= dt;
+        if (this.portalTimer <= 0) {
+          if (this.portalOn) {
+            this.portal?.el.remove();
+            this.portal = null;
+            this.portalOn = false;
+            this.portalTimer = rand(...PORTAL_OFF);
+          } else {
+            this.spawnPortal();
+            this.portalOn = true;
+            this.portalTimer = rand(...PORTAL_ON);
+          }
         }
       }
 
-      // buff targets
-      this.targetTimer -= dt;
-      if (this.targetTimer <= 0) {
-        this.spawnTarget();
-        this.targetTimer = rand(...TARGET_EVERY);
+      // buff targets — gated even later
+      const targetReady = !this.levelGate || level >= TARGET_MIN_LEVEL || count >= TARGET_MIN_COUNT;
+      if (targetReady) {
+        this.targetTimer -= dt;
+        if (this.targetTimer <= 0) {
+          this.spawnTarget();
+          this.targetTimer = rand(...TARGET_EVERY);
+        }
       }
     }
 

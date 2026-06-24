@@ -152,6 +152,13 @@ export class Hud {
     this.updateUnlocks(this.currentUnlockLevel);
   }
 
+  /** Pulse-highlight a toolbar button to draw the player's attention. Pass null to clear. */
+  highlightTool(tool: Tool | null): void {
+    for (const [t, btn] of this.toolButtons) {
+      btn.classList.toggle("tutorial-highlight", t === tool);
+    }
+  }
+
   /** Show every tool regardless of unlock level or tutorial filter (for Sandbox). */
   showAllTools(): void {
     this.toolFilter = null;

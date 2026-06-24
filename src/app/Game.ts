@@ -71,6 +71,7 @@ export class Game {
   private tutorialStep = 0;
   private tutorialTimer = 0;
   private tutorialStep2Phase: 0 | 1 | 2 = 0; // attract-lesson sub-state
+  private tutorialPhaseTimer = 0; // timer within an attract sub-phase
 
   constructor(canvas: HTMLCanvasElement, uiRoot: HTMLElement) {
     this.system = new CpuParticleSystem(this.device.capacity);
@@ -172,8 +173,10 @@ export class Game {
     });
 
     this.state.onLevelUp = (level) => {
-      this.powerups.grantRandom();
-      this.gameHud.update();
+      if (this.save.data.firstPlayDone) {
+        this.powerups.grantRandom();
+        this.gameHud.update();
+      }
       this.notify(`Level ${level}`, "Capacity & energy up", "level");
       Haptics.level();
       this.checkAch();
@@ -356,58 +359,73 @@ export class Game {
         }
         break;
 
-      case 1: // a couple more taps; auto-advances so nothing stalls
-        if (this.system.count >= 3 || (this.state.locked && this.tutorialTimer > 2) || this.tutorialTimer > 25) {
+      case 1: // a couple more taps; require a minimum pause before revealing attract
+        if ((this.system.count >= 3 && this.tutorialTimer > 2) || this.tutorialTimer > 25) {
           this.advanceTutorial(2);
           this.tutorialStep2Phase = 0;
+          this.tutorialPhaseTimer = 0;
           this.gameHud.setReveal(1); // show level + XP bar
-          this.hud.setTutorialTools(["spawn", "attract"]); // unlock Attract
-          this.coach.show("Tap ◉ Attract in the toolbar, then hold the screen");
+          this.hud.setTutorialTools(["spawn", "attract"]); // reveal Attract
+          this.hud.highlightTool("attract"); // pulse to draw attention
+          this.coach.show("Tap ◉ Attract");
         }
         break;
 
-      case 2: { // attract lesson — three progressive messages; must hold then release
+      case 2: { // attract lesson — player taps attract, holds, then auto-advances
+        this.tutorialPhaseTimer += dt;
         if (this.tutorialStep2Phase === 0 && this.input.tool === "attract") {
+          // player selected attract — remove highlight, prompt to hold
           this.tutorialStep2Phase = 1;
-          this.coach.show("Hold your finger on the screen ◉");
+          this.tutorialPhaseTimer = 0;
+          this.hud.highlightTool(null);
+          this.coach.show("Hold the screen — pull them close ◉");
         } else if (this.tutorialStep2Phase === 1 && this.input.getForces().length > 0) {
+          // player is holding — start counting hold time
           this.tutorialStep2Phase = 2;
-          this.coach.show("Feel it? Lift your finger ◉");
-        }
-        const attracted = this.tutorialStep2Phase === 2 && this.input.getForces().length === 0;
-        if (attracted || this.tutorialTimer > 40) {
+          this.tutorialPhaseTimer = 0;
+        } else if (this.tutorialStep2Phase === 2 &&
+                   (this.input.getForces().length === 0 || this.tutorialPhaseTimer >= 3)) {
+          // player released or held long enough — advance
+          this.hud.highlightTool(null);
           this.tutorialStep2Phase = 0;
           this.advanceTutorial(3);
-          this.coach.show("Keep them moving to earn faster — watch the XP bar climb ✦");
+          this.coach.show("Stir them — every move scores ✦");
+        }
+        // timeout fallback: if stuck, push forward
+        if (this.tutorialStep === 2 && this.tutorialTimer > 50) {
+          this.hud.highlightTool(null);
+          this.tutorialStep2Phase = 0;
+          this.advanceTutorial(3);
+          this.coach.show("Stir them — every move scores ✦");
         }
         break;
       }
 
-      case 3: // move-to-earn lesson, then introduce a single obstacle
-        if (this.tutorialTimer > 25) {
+      case 3: // move-to-earn lesson; introduce obstacle once player reaches level 2
+        if (this.state.level >= 2 || this.tutorialTimer > 45) {
           this.advanceTutorial(4);
-          this.gameHud.setReveal(2); // show energy + points
+          this.gameHud.setReveal(2); // show energy + points now that they've earned a level
           this.playfield.setTutorial(true); // one static obstacle only — no portals/targets yet
           this.playfield.setEnabled(true);
-          this.coach.show("Obstacles deflect your swarm — steer around them ✦");
+          this.coach.setVisible(false); // let the obstacle speak for itself
         }
         break;
 
-      case 4: // obstacle lesson, then hand off to the real game
-        if (this.tutorialTimer > 25) {
+      case 4: // obstacle discovery phase, then hand off to the real game
+        if (this.tutorialTimer > 30) {
           this.save.data.firstPlayDone = true;
           this.save.persist();
-          this.playfield.setTutorial(false); // portals + buff targets now resume (on their timers)
+          this.playfield.setTutorial(false); // portals + buff targets now resume (level-gated)
           this.specials.setEnabled(true); // visitors allowed now, but gated by swarm size
           this.gameHud.setReveal(3); // full UI
           this.hud.setTutorialTools(null); // restore normal unlock behaviour
           this.hud.updateUnlocks(this.save.data.level);
           this.hud.setStatsVisible(true);
-          this.coach.show("You're ready — grow your swarm and watch for rare visitors ✦");
+          this.coach.show("You're ready — grow your swarm ✦");
           this.tutorialStep = 5;
           setTimeout(() => {
             if (this.mode === "game") this.coach.setVisible(false);
-          }, 5000);
+          }, 4000);
         }
         break;
     }
@@ -468,7 +486,7 @@ export class Game {
     );
 
     this.system.step(dt);
-    this.playfield.update(dt);
+    this.playfield.update(dt, this.state.level, this.system.count);
 
     // pushing enough particles through portals earns a power-up
     if (this.mode === "game") {

@@ -123,6 +123,17 @@ body {
   pointer-events: none;
 }
 
+/* Tutorial highlight: pulsing glow to draw attention to a specific toolbar button */
+.hud-btn.tutorial-highlight {
+  border-color: var(--accent);
+  box-shadow: 0 0 16px rgba(46, 230, 255, 0.55);
+  animation: tut-highlight 1.3s ease-in-out infinite;
+}
+@keyframes tut-highlight {
+  0%, 100% { box-shadow: 0 0 10px rgba(46, 230, 255, 0.4); }
+  50%       { box-shadow: 0 0 28px rgba(46, 230, 255, 0.9), 0 0 6px rgba(46, 230, 255, 0.6) inset; }
+}
+
 .hud-stats {
   position: fixed;
   top: max(10px, env(safe-area-inset-top));

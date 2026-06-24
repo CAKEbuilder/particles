@@ -203,6 +203,8 @@ export class GameHud {
     this.rowEnergy.classList.toggle("hidden-ui", stage < 2);
     // xp bar: hidden until stage 1
     this.rowXp.classList.toggle("hidden-ui", stage < 1);
+    // active power-up timers: hidden until stage 2 (don't confuse with buff UI before it's explained)
+    this.powerEl.classList.toggle("hidden-ui", stage < 2);
     // shop button gated by level separately (updateunlocks handles it)
   }
 
