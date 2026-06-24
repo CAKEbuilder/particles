@@ -127,14 +127,18 @@ export class Hud {
       if (btn) {
         const lockedByLevel = level < t.unlockLevel;
         const hiddenByFilter = this.toolFilter !== null && !this.toolFilter.includes(t.tool);
-        btn.classList.toggle("hidden-ui", lockedByLevel || hiddenByFilter);
+        // level-lock = display:none (truly absent); tutorial-filter = opacity fade (no layout shift)
+        btn.classList.toggle("hidden-ui", lockedByLevel);
+        btn.classList.toggle("tut-hidden", !lockedByLevel && hiddenByFilter);
       }
     }
     const gravLocked = level < unlocks["gravity"];
     const tiltLocked = level < unlocks["tilt"];
-    this.gravityBtn.classList.toggle("hidden-ui", gravLocked || this.toolFilter !== null);
-    this.tiltBtn.classList.toggle("hidden-ui", tiltLocked || this.toolFilter !== null);
-    // if active tool is now hidden, fall back to spawn
+    this.gravityBtn.classList.toggle("hidden-ui", gravLocked);
+    this.gravityBtn.classList.toggle("tut-hidden", !gravLocked && this.toolFilter !== null);
+    this.tiltBtn.classList.toggle("hidden-ui", tiltLocked);
+    this.tiltBtn.classList.toggle("tut-hidden", !tiltLocked && this.toolFilter !== null);
+    // if active tool is now tutorial-hidden, fall back to spawn
     const activeTool = this.input.tool as Tool;
     const activeDef = TOOLS.find((t) => t.tool === activeTool);
     if (activeDef && (level < activeDef.unlockLevel || (this.toolFilter !== null && !this.toolFilter.includes(activeTool)))) {
@@ -151,9 +155,16 @@ export class Hud {
   /** Show every tool regardless of unlock level or tutorial filter (for Sandbox). */
   showAllTools(): void {
     this.toolFilter = null;
-    for (const [, btn] of this.toolButtons) btn.classList.remove("hidden-ui");
-    this.gravityBtn.classList.remove("hidden-ui");
-    this.tiltBtn.classList.remove("hidden-ui");
+    for (const [, btn] of this.toolButtons) {
+      btn.classList.remove("hidden-ui", "tut-hidden");
+    }
+    this.gravityBtn.classList.remove("hidden-ui", "tut-hidden");
+    this.tiltBtn.classList.remove("hidden-ui", "tut-hidden");
+  }
+
+  /** Hide/show the fps + particle count stats readout (suppressed during tutorial). */
+  setStatsVisible(v: boolean): void {
+    this.stats.classList.toggle("hidden-ui", !v);
   }
 
   update(fps: number, count: number): void {

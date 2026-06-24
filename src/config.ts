@@ -90,7 +90,7 @@ export const config = {
       lockClearFraction: 0.3, // once depleted, must refill to this fraction before spawning again
     },
     burstBase: 1,      // particles per tap at level 1 in game mode
-    burstPerLevel: 1,  // +1 per tap per level (so L2=2, L3=3, etc.)
+    burstPerLevel: 0,  // burst only grows via the burst buff, not automatically with level
     xpPerLevelBase: 100, // lifetime points needed for level 2 (~67s with 3 particles at 0.5 pts/s)
     xpGrowth: 1.4, // each level costs this much more
     ascendLevel: 12, // level required to ascend (prestige)

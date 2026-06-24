@@ -95,7 +95,7 @@ body {
   min-height: 40px;
   border-radius: 10px;
   cursor: pointer;
-  transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.05s;
+  transition: opacity 0.3s ease, color 0.15s, background 0.15s, border-color 0.15s, transform 0.05s;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -116,6 +116,11 @@ body {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   border-color: transparent;
   box-shadow: 0 0 18px rgba(46, 230, 255, 0.35);
+}
+/* Tutorial tool filter: fade without removing from layout (prevents button-row reflow on reveal) */
+.hud-btn.tut-hidden {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .hud-stats {
@@ -270,7 +275,7 @@ body {
 .game-hud {
   pointer-events: auto;
   position: fixed;
-  top: max(10px, env(safe-area-inset-top));
+  top: max(58px, calc(env(safe-area-inset-top) + 48px));
   right: 12px;
   width: min(240px, 46vw);
   display: flex;

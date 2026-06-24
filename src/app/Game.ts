@@ -317,6 +317,7 @@ export class Game {
           this.input.burstSize = 1; // one particle per tap so the lesson lands
           this.gameHud.setReveal(0); // start with counter only
           this.hud.setTutorialTools(["spawn"]); // only Spawn visible at start
+          this.hud.setStatsVisible(false); // hide fps/count readout during tutorial
           this.coach.show("Tap the screen ✦");
         }
         this.hud.updateUnlocks(this.save.data.level);
@@ -406,6 +407,7 @@ export class Game {
           this.gameHud.setReveal(3); // full UI
           this.hud.setTutorialTools(null); // restore normal unlock behaviour
           this.hud.updateUnlocks(this.save.data.level);
+          this.hud.setStatsVisible(true);
           this.coach.show("You're ready — keep growing your swarm ✦");
           this.tutorialStep = 6;
           setTimeout(() => {
@@ -445,10 +447,11 @@ export class Game {
     if (this.mode === "game") {
       // Must be set before input.update so tap handlers on this frame see the right values
       this.system.softCap = this.state.maxCapacity;
-      this.input.burstSize =
-        !this.save.data.firstPlayDone && this.tutorialStep <= 1
-          ? 1
-          : this.state.burstSize;
+      const burst = !this.save.data.firstPlayDone && this.tutorialStep <= 1
+        ? 1
+        : this.state.burstSize;
+      this.input.burstSize = burst;
+      this.input.streamRate = burst; // holding spawn = same rate as burst (1/sec until buff unlocked)
       this.input.attractMult = this.state.attractMult;
     }
 
