@@ -887,7 +887,8 @@ body {
   font-size: 52px;
   animation: floaty 2s ease-in-out infinite;
 }
-@media (orientation: landscape) {
+/* Only block landscape on real touch devices (phones); desktop can play in any orientation */
+@media (orientation: landscape) and (pointer: coarse) and (hover: none) {
   #rotate-prompt { display: flex; }
   #scene, #ui { visibility: hidden; }
 }
