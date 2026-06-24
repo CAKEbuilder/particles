@@ -117,7 +117,7 @@ export class Game {
     });
     this.playfield = new Playfield(uiRoot, this.system, () => {
       this.powerups.grantRandom();
-      this.toast.show("Buff secured", "Target cleared", "level");
+      this.notify("Buff secured", "Target cleared", "level");
       this.gameHud.update();
       Haptics.unlock();
     });
@@ -161,7 +161,7 @@ export class Game {
         if (isNew) {
           this.save.data.points += 250; // discovery bonus
           this.save.persist();
-          this.toast.show("Discovered", def.name, "ach");
+          this.notify("Discovered", def.name, "ach");
           Haptics.unlock();
         }
         // every special you experience rewards a temporary power-up
@@ -174,13 +174,13 @@ export class Game {
     this.state.onLevelUp = (level) => {
       this.powerups.grantRandom();
       this.gameHud.update();
-      this.toast.show(`Level ${level}`, "Capacity & energy up", "level");
+      this.notify(`Level ${level}`, "Capacity & energy up", "level");
       Haptics.level();
       this.checkAch();
       // announce newly unlocked tools
       for (const t of UNLOCK_TOASTS) {
         if (config.toolUnlocks[t.key] === level) {
-          setTimeout(() => this.toast.show("New tool!", t.label, "ach"), 600);
+          setTimeout(() => this.notify("New tool!", t.label, "ach"), 600);
         }
       }
       this.hud.updateUnlocks(level);
@@ -190,7 +190,7 @@ export class Game {
       const [lo, hi] = this.state.spectrumBand();
       this.system.hueLo = lo;
       this.system.hueHi = hi;
-      this.toast.show("New colour unlocked", `Spectrum ${s}/${config.spectrumMax}`, "ach");
+      this.notify("New colour unlocked", `Spectrum ${s}/${config.spectrumMax}`, "ach");
       Haptics.unlock();
     };
 
@@ -291,6 +291,7 @@ export class Game {
         this.input.streamRate = config.spawn.streamPerSec;
         this.ambientBloom(w, h);
         this.hud.setVisible(true);
+        this.hud.showAllTools(); // sandbox has no tool restrictions
         break;
 
       case "game": {
@@ -314,7 +315,8 @@ export class Game {
           this.tutorialTimer = 0;
           this.tutorialStep2Phase = 0;
           this.input.burstSize = 1; // one particle per tap so the lesson lands
-          this.gameHud.setTutorialMode(true); // hide energy bar + pts clutter
+          this.gameHud.setReveal(0); // start with counter only
+          this.hud.setTutorialTools(["spawn"]); // only Spawn visible at start
           this.coach.show("Tap the screen ✦");
         }
         this.hud.updateUnlocks(this.save.data.level);
@@ -357,6 +359,8 @@ export class Game {
         if (this.system.count >= 3 || (this.state.locked && this.tutorialTimer > 2) || this.tutorialTimer > 25) {
           this.advanceTutorial(2);
           this.tutorialStep2Phase = 0;
+          this.gameHud.setReveal(1); // show level + XP bar
+          this.hud.setTutorialTools(["spawn", "attract"]); // unlock Attract
           this.coach.show("Tap ◉ Attract in the toolbar, then hold the screen");
         }
         break;
@@ -381,6 +385,7 @@ export class Game {
       case 3: // XP accumulates; player levels up here with new economy
         if (this.tutorialTimer > 30) {
           this.advanceTutorial(4);
+          this.gameHud.setReveal(2); // show energy + points
           this.playfield.setEnabled(true);
           this.coach.show("Obstacles deflect particles — use your tools to influence them");
         }
@@ -398,7 +403,9 @@ export class Game {
         if ((!this.specials.isBusy() && this.tutorialTimer > 30) || this.tutorialTimer > 70) {
           this.save.data.firstPlayDone = true;
           this.save.persist();
-          this.gameHud.setTutorialMode(false);
+          this.gameHud.setReveal(3); // full UI
+          this.hud.setTutorialTools(null); // restore normal unlock behaviour
+          this.hud.updateUnlocks(this.save.data.level);
           this.coach.show("You're ready — keep growing your swarm ✦");
           this.tutorialStep = 6;
           setTimeout(() => {
@@ -425,23 +432,24 @@ export class Game {
   private update(dt: number): void {
     if (this.paused) return; // frozen: keep the field intact, resume exactly where we left off
 
-    if (this.mode === "game") {
-      // Scale particle size up when few are on screen — prominent lone particles during tutorial.
-      // O(n) write only while n < 20, free at full field.
+    // Continuous particle size: big solo, shrinks smoothly as count grows, tiny in thousands.
+    // Runs in game + sandbox + intro so the curve is consistent across all playable modes.
+    if (this.mode === "game" || this.mode === "sandbox" || this.mode === "intro") {
       const n = this.system.count;
-      if (n < 20) {
-        const sz = 3.4 + ((20 - n) / 20) * 8; // 11.4 at 0 → 3.4 at 20
-        config.spawn.size = sz;
-        for (let i = 0; i < n; i++) this.system.size[i] = sz;
-      } else {
-        config.spawn.size = 3.4;
-      }
+      const sc = config.spawn.sizeByCount;
+      const sz = sc.min + (sc.max - sc.min) / (1 + n / sc.k);
+      config.spawn.size = sz;
+      for (let i = 0; i < n; i++) this.system.size[i] = sz;
+    }
+
+    if (this.mode === "game") {
       // Must be set before input.update so tap handlers on this frame see the right values
       this.system.softCap = this.state.maxCapacity;
       this.input.burstSize =
         !this.save.data.firstPlayDone && this.tutorialStep <= 1
           ? 1
           : this.state.burstSize;
+      this.input.attractMult = this.state.attractMult;
     }
 
     this.input.update(dt);
@@ -515,8 +523,14 @@ export class Game {
     this.powerups.clear();
     this.portalAccum = 0;
     this.gameHud.update();
-    this.toast.show("Ascended ✦", `${Math.round(this.state.ascensionMult * 100)}% points forever`, "ascend");
+    this.notify("Ascended ✦", `${Math.round(this.state.ascensionMult * 100)}% points forever`, "ascend");
     this.checkAch();
+  }
+
+  /** Toast wrapper that silences all in-game notifications while the tutorial is running. */
+  private notify(title: string, msg: string, kind: "level" | "ach" | "ascend"): void {
+    if (!this.save.data.firstPlayDone && this.mode === "game") return;
+    this.toast.show(title, msg, kind);
   }
 
   private checkAch(): void {

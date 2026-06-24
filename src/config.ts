@@ -32,12 +32,13 @@ export const config = {
 
   // ---- spawning ----
   spawn: {
-    burst: 90, // particles per tap (energy gates game mode to ~3 at level 1)
+    burst: 90, // particles per tap in sandbox/title (energy gates game mode separately)
     streamPerSec: 900, // particles/s while holding the spawn tool
     speed: 70, // initial outward speed (px/s)
     speedJitter: 60,
     size: 3.4,
     sizeJitter: 1.6,
+    sizeByCount: { max: 12, min: 1.5, k: 40 }, // continuous size curve: big solo, tiny in thousands
   },
 
   // ---- pointer forces ----
@@ -88,17 +89,20 @@ export const config = {
       costPerParticle: 0.6, // energy spent per spawned particle
       lockClearFraction: 0.3, // once depleted, must refill to this fraction before spawning again
     },
+    burstBase: 1,      // particles per tap at level 1 in game mode
+    burstPerLevel: 1,  // +1 per tap per level (so L2=2, L3=3, etc.)
     xpPerLevelBase: 100, // lifetime points needed for level 2 (~67s with 3 particles at 0.5 pts/s)
     xpGrowth: 1.4, // each level costs this much more
     ascendLevel: 12, // level required to ascend (prestige)
     ascendBonus: 0.25, // permanent point multiplier gained per ascension
     // permanent buffs ordered by when they unlock: id -> { base cost, growth, per-tier effect, max tier, label, desc, unlockLevel }
     buffs: {
-      capacity:    { cost: 150, growth: 1.7, per: 1200, max: 12, label: "Capacity",    desc: "More particles on screen",       unlockLevel: 2 },
-      energyMax:   { cost: 120, growth: 1.7, per: 60,   max: 10, label: "Energy max",  desc: "Larger spawn energy pool",       unlockLevel: 3 },
-      energyRegen: { cost: 120, growth: 1.7, per: 10,   max: 10, label: "Energy regen",desc: "Refills your energy faster",     unlockLevel: 4 },
-      burst:       { cost: 180, growth: 1.8, per: 35,   max: 8,  label: "Burst size",  desc: "More particles per tap",         unlockLevel: 5 },
-      pointMult:   { cost: 200, growth: 1.8, per: 0.15, max: 8,  label: "Score Boost", desc: "Earn more points per particle",  unlockLevel: 6 },
+      capacity:     { cost: 150, growth: 1.7, per: 1200, max: 12, label: "Capacity",       desc: "More particles on screen",           unlockLevel: 2 },
+      energyMax:    { cost: 120, growth: 1.7, per: 60,   max: 10, label: "Energy max",     desc: "Larger spawn energy pool",           unlockLevel: 3 },
+      energyRegen:  { cost: 120, growth: 1.7, per: 10,   max: 10, label: "Energy regen",   desc: "Refills your energy faster",         unlockLevel: 4 },
+      attractForce: { cost: 160, growth: 1.7, per: 0.25, max: 8,  label: "Attract power",  desc: "Stronger pull for finer control",    unlockLevel: 3 },
+      burst:        { cost: 180, growth: 1.8, per: 2,    max: 8,  label: "Burst size",     desc: "More particles per tap",             unlockLevel: 5 },
+      pointMult:    { cost: 200, growth: 1.8, per: 0.15, max: 8,  label: "Score Boost",    desc: "Earn more points per particle",      unlockLevel: 6 },
     } as Record<string, { cost: number; growth: number; per: number; max: number; label: string; desc: string; unlockLevel: number }>,
   },
 

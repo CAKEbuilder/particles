@@ -137,7 +137,7 @@ body {
   font-size: 18px;
 }
 
-/* hero pts/sec readout — the number you always want high */
+/* hero slot (top-centre): swarm counter + pts/s */
 .hero {
   position: fixed;
   top: max(8px, env(safe-area-inset-top));
@@ -148,23 +148,35 @@ body {
   user-select: none;
   z-index: 4;
 }
-.hero-pps {
-  font-size: 15px;
-  color: var(--text-dim);
-  letter-spacing: 0.04em;
-}
-.hero-pps-val {
-  font-size: 40px;
+.swarm-count {
+  font-size: 28px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: #eaf3ff;
-  text-shadow: 0 0 18px rgba(46, 230, 255, 0.5), 0 2px 10px rgba(0, 0, 0, 0.8);
-}
-.hero-hint {
-  font-size: 11px;
-  color: var(--text-dim);
   letter-spacing: 0.03em;
-  margin-top: 1px;
+  text-shadow: 0 0 18px rgba(46, 230, 255, 0.5), 0 2px 10px rgba(0, 0, 0, 0.8);
+  display: inline-block; /* needed for transform animation */
+  transform-origin: center bottom;
+}
+.swarm-count.count-pop {
+  animation: count-pop 0.18s ease-out forwards;
+}
+@keyframes count-pop {
+  0%   { transform: scale(1.18); filter: brightness(1.5); }
+  100% { transform: scale(1);    filter: brightness(1); }
+}
+.hero-pps {
+  font-size: 13px;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+.hero-pps-val {
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #eaf3ff;
+  text-shadow: 0 0 12px rgba(46, 230, 255, 0.4), 0 2px 8px rgba(0, 0, 0, 0.7);
 }
 
 .apex-logo {

@@ -83,8 +83,12 @@ export class GameState {
     return this.save.data.ascension;
   }
   get burstSize(): number {
-    const base = config.spawn.burst + this.tier("burst") * this.per("burst");
+    const g = config.game;
+    const base = g.burstBase + (this.level - 1) * g.burstPerLevel + this.tier("burst") * this.per("burst");
     return Math.floor(base * (this.powerups?.burstMult() ?? 1));
+  }
+  get attractMult(): number {
+    return 1 + this.tier("attractForce") * this.per("attractForce");
   }
 
   resetEnergy(): void {

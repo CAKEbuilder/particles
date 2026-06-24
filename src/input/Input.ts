@@ -20,6 +20,7 @@ export class Input {
   tool: Tool = "spawn";
   burstSize = config.spawn.burst; // overridden by game progression
   streamRate = config.spawn.streamPerSec;
+  attractMult = 1; // overridden per-frame by GameState in game mode
   /** Optional gate: given a requested spawn count, returns how many are allowed
    *  (after capacity + energy), consuming resources. null = unlimited (sandbox). */
   gate: ((requested: number) => number) | null = null;
@@ -108,7 +109,7 @@ export class Input {
           break;
         }
         case "attract":
-          fp.push(this.radial(p.x, p.y, config.pointer.attract));
+          fp.push(this.radial(p.x, p.y, config.pointer.attract * this.attractMult));
           this.maybeToolSound("attract", p.x, p.y, 0.5);
           break;
         case "repel":
