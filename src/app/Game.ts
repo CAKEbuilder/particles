@@ -383,33 +383,28 @@ export class Game {
         break;
       }
 
-      case 3: // XP accumulates; player levels up here with new economy
-        if (this.tutorialTimer > 30) {
+      case 3: // move-to-earn lesson, then introduce a single obstacle
+        if (this.tutorialTimer > 25) {
           this.advanceTutorial(4);
           this.gameHud.setReveal(2); // show energy + points
+          this.playfield.setTutorial(true); // one static obstacle only — no portals/targets yet
           this.playfield.setEnabled(true);
-          this.coach.show("Obstacles deflect particles — use your tools to influence them");
+          this.coach.show("Obstacles deflect your swarm — steer around them ✦");
         }
         break;
 
-      case 4: // playfield lesson, then introduce specials
-        if (this.tutorialTimer > 30) {
-          this.advanceTutorial(5);
-          this.specials.setEnabled(true);
-          this.coach.show("Rare visitors appear at the edges — watch for alerts ◈");
-        }
-        break;
-
-      case 5: // wait for special or generous timeout
-        if ((!this.specials.isBusy() && this.tutorialTimer > 30) || this.tutorialTimer > 70) {
+      case 4: // obstacle lesson, then hand off to the real game
+        if (this.tutorialTimer > 25) {
           this.save.data.firstPlayDone = true;
           this.save.persist();
+          this.playfield.setTutorial(false); // portals + buff targets now resume (on their timers)
+          this.specials.setEnabled(true); // visitors allowed now, but gated by swarm size
           this.gameHud.setReveal(3); // full UI
           this.hud.setTutorialTools(null); // restore normal unlock behaviour
           this.hud.updateUnlocks(this.save.data.level);
           this.hud.setStatsVisible(true);
-          this.coach.show("You're ready — keep growing your swarm ✦");
-          this.tutorialStep = 6;
+          this.coach.show("You're ready — grow your swarm and watch for rare visitors ✦");
+          this.tutorialStep = 5;
           setTimeout(() => {
             if (this.mode === "game") this.coach.setVisible(false);
           }, 5000);

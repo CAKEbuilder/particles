@@ -49,6 +49,7 @@ export class Playfield {
   private obstacle: Obstacle | null = null;
   private targets: Target[] = [];
   private enabled = false;
+  private tutorial = false; // tutorial mode: one static obstacle only — no portals, targets, or reshaping
 
   private obstacleTimer = 0;
   private portalTimer = 0;
@@ -68,6 +69,17 @@ export class Playfield {
     this.enabled = on;
     if (on) this.build();
     else this.clear();
+  }
+
+  /** Tutorial mode shows only a single static obstacle; portals/targets/reshaping are held back.
+   *  Turning it off re-seeds the portal/target timers so they don't all fire at once. */
+  setTutorial(on: boolean): void {
+    this.tutorial = on;
+    if (!on) {
+      this.portalTimer = PORTAL_FIRST;
+      this.targetTimer = TARGET_FIRST;
+      this.obstacleTimer = rand(...OBSTACLE_CHANGE);
+    }
   }
 
   private clear(): void {
@@ -138,8 +150,8 @@ export class Playfield {
     const h = window.innerHeight;
     const x = rand(w * 0.25, w * 0.75);
     const y = rand(h * 0.25, h * 0.7);
-    const r = 52;
-    const hp = 800;
+    const r = 38;
+    const hp = 480;
     const el = document.createElement("div");
     el.className = "target";
     el.style.left = `${x}px`;
@@ -159,33 +171,36 @@ export class Playfield {
     const w = window.innerWidth;
     const h = window.innerHeight;
 
-    // obstacle relocation/retype
-    this.obstacleTimer -= dt;
-    if (this.obstacleTimer <= 0) {
-      this.relocateObstacle();
-      this.obstacleTimer = rand(...OBSTACLE_CHANGE);
-    }
-
-    // portals cycle on/off
-    this.portalTimer -= dt;
-    if (this.portalTimer <= 0) {
-      if (this.portalOn) {
-        this.portal?.el.remove();
-        this.portal = null;
-        this.portalOn = false;
-        this.portalTimer = rand(...PORTAL_OFF);
-      } else {
-        this.spawnPortal();
-        this.portalOn = true;
-        this.portalTimer = rand(...PORTAL_ON);
+    // tutorial: just the single obstacle (no reshaping, portals, or targets)
+    if (!this.tutorial) {
+      // obstacle relocation/retype
+      this.obstacleTimer -= dt;
+      if (this.obstacleTimer <= 0) {
+        this.relocateObstacle();
+        this.obstacleTimer = rand(...OBSTACLE_CHANGE);
       }
-    }
 
-    // buff targets
-    this.targetTimer -= dt;
-    if (this.targetTimer <= 0) {
-      this.spawnTarget();
-      this.targetTimer = rand(...TARGET_EVERY);
+      // portals cycle on/off
+      this.portalTimer -= dt;
+      if (this.portalTimer <= 0) {
+        if (this.portalOn) {
+          this.portal?.el.remove();
+          this.portal = null;
+          this.portalOn = false;
+          this.portalTimer = rand(...PORTAL_OFF);
+        } else {
+          this.spawnPortal();
+          this.portalOn = true;
+          this.portalTimer = rand(...PORTAL_ON);
+        }
+      }
+
+      // buff targets
+      this.targetTimer -= dt;
+      if (this.targetTimer <= 0) {
+        this.spawnTarget();
+        this.targetTimer = rand(...TARGET_EVERY);
+      }
     }
 
     this.applyInteractions(w, h);

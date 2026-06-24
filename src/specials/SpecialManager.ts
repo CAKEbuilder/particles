@@ -97,6 +97,11 @@ export class SpecialManager {
     if (this.pending || this.active.length) return;
     this.cooldown -= dt;
     if (this.cooldown > 0) return;
+    // don't drop a visitor into a tiny swarm (it would eat the whole field); wait for it to grow
+    if (this.system.count < config.specials.minParticles) {
+      this.cooldown = 2;
+      return;
+    }
     this.schedule();
   }
 

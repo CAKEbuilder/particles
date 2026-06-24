@@ -112,6 +112,7 @@ export const config = {
   specials: {
     alertLeadSec: 15, // warning time before a special arrives
     firstDelaySec: 18, // delay before the first special of a run
+    minParticles: 45, // don't send a visitor until the swarm is at least this big (they consume particles)
     intervalMin: 24, // seconds between specials
     intervalMax: 52,
     flySpeed: 95, // px/s travel speed
