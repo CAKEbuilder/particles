@@ -23,6 +23,7 @@ interface Active {
   phase: Phase;
   timeLeft: number;
   fed: number; // particles consumed so far (blast specials)
+  appetite: number; // computed at spawn from appetiteFrac × capacity
   el: HTMLDivElement;
   countEl: HTMLDivElement;
   hpEl: HTMLDivElement | null; // satiation bar fill (blast specials only)
@@ -46,7 +47,8 @@ export class SpecialManager {
     private readonly parent: HTMLElement,
     private readonly system: CpuParticleSystem,
     private readonly save: Save,
-    private readonly events: SpecialEvents = {}
+    private readonly events: SpecialEvents = {},
+    private readonly getCapacity: () => number = () => 100
   ) {}
 
   setEnabled(on: boolean): void {
@@ -187,6 +189,16 @@ export class SpecialManager {
     const ang = Math.atan2(ty - ey, tx - ex);
     const sp = config.specials.flySpeed;
 
+    // compute appetite at spawn time from the player's current capacity (always claimable)
+    const appetite = isBlast
+      ? Math.max(
+          config.specials.minAppetite,
+          Math.ceil((def.appetiteFrac ?? 1) * this.getCapacity())
+        )
+      : 0;
+
+    if (hpEl) hpEl.style.width = "0%"; // start visibly empty
+
     this.active.push({
       def,
       x: ex,
@@ -196,6 +208,7 @@ export class SpecialManager {
       phase: "enter",
       timeLeft: def.lingerSec,
       fed: 0,
+      appetite,
       el,
       countEl,
       hpEl,
@@ -237,14 +250,15 @@ export class SpecialManager {
 
         if (a.def.behavior === "blast") {
           // feed it: it consumes nearby particles (capped rate); satisfy its appetite to unlock
-          const appetite = a.def.appetite ?? 1;
           const maxEat = Math.ceil(config.specials.eatPerSec * dt);
           a.fed += this.system.consumeNear(a.x, a.y, config.specials.hitRadius, maxEat);
-          const frac = Math.min(1, a.fed / appetite);
-          if (a.hpEl) a.hpEl.style.width = `${frac * 100}%`; // satiation fills up
+          const frac = Math.min(1, a.fed / a.appetite);
+          if (a.hpEl) a.hpEl.style.width = `${frac * 100}%`;
           a.el.style.setProperty("--fed", String(frac));
-          this.renderView(a, `${Math.ceil(Math.max(0, a.timeLeft))}`);
-          if (a.fed >= appetite) {
+          // show "fed / needed" so progress is legible
+          const needed = a.appetite - Math.floor(a.fed);
+          this.renderView(a, `${Math.ceil(Math.max(0, a.timeLeft))}s · ${needed > 0 ? needed : "✓"}`);
+          if (a.fed >= a.appetite) {
             const isNew = this.save.discover(a.def.id); // satisfied -> unlock
             this.events.onDiscover?.(a.def, isNew);
             this.burst(a.x, a.y); // celebratory pop

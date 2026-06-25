@@ -21,7 +21,8 @@ export interface SpecialDef {
   behavior: Behavior;
   effects: EffectSpec[];
   lingerSec: number; // seconds on field before it leaves
-  appetite?: number; // blast: particles it must consume (be fed) to be satisfied -> unlock
+  /** blast: fraction of the player's current capacity that must be consumed (always claimable) */
+  appetiteFrac?: number;
   desc: string[];
 }
 
@@ -54,7 +55,7 @@ export const DEFS: SpecialDef[] = [
     behavior: "blast",
     effects: [{ kind: "vortex", level: 2 }],
     lingerSec: 12,
-    appetite: 350,
+    appetiteFrac: 0.8, // 80% of current capacity
     desc: ["Spins the swarm into a hypnotic whirl.", "Feed it particles to unlock."],
   },
   {
@@ -68,7 +69,7 @@ export const DEFS: SpecialDef[] = [
       { kind: "vortex", level: 2 },
     ],
     lingerSec: 13,
-    appetite: 700,
+    appetiteFrac: 1.3, // 130% of current capacity — takes a couple refill cycles
     desc: ["Gathers and swirls — a living kaleidoscope.", "Feed it particles to unlock."],
   },
   {
@@ -82,7 +83,7 @@ export const DEFS: SpecialDef[] = [
       { kind: "destroy", level: 2 },
     ],
     lingerSec: 15,
-    appetite: 1500,
+    appetiteFrac: 2.0, // 200% — needs sustained feeding effort
     desc: ["Pulls particles in and devours them.", "Let it consume enough to unlock."],
   },
   {
@@ -93,7 +94,7 @@ export const DEFS: SpecialDef[] = [
     behavior: "blast",
     effects: [{ kind: "attract", level: 4 }],
     lingerSec: 20,
-    appetite: 400,
+    appetiteFrac: 0.8,
     desc: [
       "A gravitational hazard that devours nearby particles.",
       "Feed it enough to send it on its way early.",
@@ -111,7 +112,7 @@ export const DEFS: SpecialDef[] = [
       { kind: "destroy", level: 1 },
     ],
     lingerSec: 18,
-    appetite: 3200,
+    appetiteFrac: 3.0, // 300% — the apex challenge
     desc: [
       "An anti-gravity black hole.",
       "Boundless power held in zen balance.",

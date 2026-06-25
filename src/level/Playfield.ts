@@ -29,6 +29,7 @@ interface Target {
   life: number; // seconds until it leaves
   el: HTMLDivElement;
   hpEl: HTMLDivElement;
+  shapeEl: HTMLDivElement;
 }
 
 const OBSTACLE_RESTITUTION = 0.7;
@@ -166,11 +167,13 @@ export class Playfield {
     el.style.top = `${y}px`;
     el.style.setProperty("--r", `${r * 2}px`);
     el.innerHTML =
-      `<div class="target-shape"></div><div class="target-glyph">✦</div>` +
+      `<div class="target-shape"></div><div class="target-glyph">◎</div>` +
       `<div class="target-hp"><div class="target-hp-fill"></div></div>`;
     this.parent.appendChild(el);
     const hpEl = el.querySelector(".target-hp-fill") as HTMLDivElement;
-    this.targets.push({ x, y, r, hp, hpMax: hp, life: TARGET_LIFE, el, hpEl });
+    const shapeEl = el.querySelector(".target-shape") as HTMLDivElement;
+    shapeEl.style.setProperty("--fill", "0");
+    this.targets.push({ x, y, r, hp, hpMax: hp, life: TARGET_LIFE, el, hpEl, shapeEl });
   }
 
   /** Advance object lifecycles + apply interactions. Game mode only. */
@@ -267,7 +270,9 @@ export class Playfield {
         if (dx * dx + dy * dy < r2) near++;
       }
       tg.hp -= near * dt;
-      tg.hpEl.style.width = `${Math.max(0, (tg.hp / tg.hpMax) * 100)}%`;
+      const fillFrac = Math.min(1, Math.max(0, 1 - tg.hp / tg.hpMax)); // 0 = untouched, 1 = done
+      tg.hpEl.style.width = `${fillFrac * 100}%`; // bar fills left→right as target is fed
+      tg.shapeEl.style.setProperty("--fill", fillFrac.toFixed(3));
 
       if (tg.hp <= 0) {
         tg.el.classList.add("target-cleared");

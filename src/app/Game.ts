@@ -155,24 +155,30 @@ export class Game {
     this.state.setPowerUps(this.powerups);
     this.powerups.onChange = () => this.gameHud.update();
 
-    this.specials = new SpecialManager(uiRoot, this.system, this.save, {
-      onArrive: (x) => {
-        const w = window.innerWidth;
-        this.scheduler.request("particle", { pan: (x / w) * 2 - 1, register: 0.85, intensity: 1 });
+    this.specials = new SpecialManager(
+      uiRoot,
+      this.system,
+      this.save,
+      {
+        onArrive: (x) => {
+          const w = window.innerWidth;
+          this.scheduler.request("particle", { pan: (x / w) * 2 - 1, register: 0.85, intensity: 1 });
+        },
+        onDiscover: (def, isNew) => {
+          if (isNew) {
+            this.save.data.points += 250; // discovery bonus
+            this.save.persist();
+            this.notify("Discovered", def.name, "ach");
+            Haptics.unlock();
+          }
+          // every special you experience rewards a temporary power-up
+          if (this.mode === "game") this.powerups.grantRandom();
+          this.gameHud.update();
+          this.checkAch();
+        },
       },
-      onDiscover: (def, isNew) => {
-        if (isNew) {
-          this.save.data.points += 250; // discovery bonus
-          this.save.persist();
-          this.notify("Discovered", def.name, "ach");
-          Haptics.unlock();
-        }
-        // every special you experience rewards a temporary power-up
-        if (this.mode === "game") this.powerups.grantRandom();
-        this.gameHud.update();
-        this.checkAch();
-      },
-    });
+      () => this.state.maxCapacity
+    );
 
     this.state.onLevelUp = (level) => {
       if (this.save.data.firstPlayDone) {

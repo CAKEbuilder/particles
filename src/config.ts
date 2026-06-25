@@ -78,15 +78,15 @@ export const config = {
 
   // ---- game / progression (game mode only; sandbox ignores all of this) ----
   game: {
-    baseCapacity: 3, // on-screen particle cap at level 1 (scarce start)
-    capacityPerLevel: 5, // +cap per level (grows slowly so each level feels meaningful)
-    pointRatePerParticle: 0.4, // base points/sec per live particle (earned even at rest)
-    movementBonus: 0.9, // up to +90% points when the swarm is fully in motion (rewards stirring/interacting)
-    movementRefSpeed: 340, // avg particle speed (px/s) for full bonus; above ambient bounce so active tools stand out
+    baseCapacity: 8, // on-screen particle cap at level 1
+    capacityPerLevel: 10, // +cap per level
+    pointRatePerParticle: 0.18, // base points/sec per live particle at rest (intentionally low — movement is the real earner)
+    movementBonus: 3.0, // up to +300% points when fully stirred (~4× idle); active play clearly wins
+    movementRefSpeed: 220, // avg particle speed (px/s) for full bonus; reachable with wind/attract so stirring registers
     energy: {
-      base: 2.0, // spawn-energy pool max at level 1 (~3 particles at 0.6 cost each)
+      base: 8.0, // spawn-energy pool max at level 1 (~13 particles); generous so hold-to-spawn feels good immediately
       perLevel: 5.0, // grows meaningfully each level
-      regenBase: 0.4, // energy/sec at level 1 (~1.5s per particle)
+      regenBase: 1.5, // energy/sec at level 1; fast enough to respawn frequently
       regenPerLevel: 1.2, // regen roughly doubles by level ~20
       costPerParticle: 0.6, // energy spent per spawned particle
       lockClearFraction: 0.3, // once depleted, must refill to this fraction before spawning again
@@ -97,14 +97,14 @@ export const config = {
     xpGrowth: 1.5, // each level costs 50% more than the last (steep, so buffs pace out)
     ascendLevel: 15, // level required to ascend (prestige)
     ascendBonus: 0.25, // permanent point multiplier gained per ascension
-    // permanent buffs ordered by when they unlock: id -> { base cost, growth, per-tier effect, max tier, label, desc, unlockLevel }
+    // permanent buffs ordered by when they unlock (shop shows in this key order)
     buffs: {
-      capacity:     { cost: 150, growth: 1.7, per: 1200, max: 12, label: "Capacity",       desc: "More particles on screen",           unlockLevel: 2 },
-      attractForce: { cost: 160, growth: 1.7, per: 0.25, max: 8,  label: "Attract power",  desc: "Stronger pull for finer control",    unlockLevel: 4 },
-      energyMax:    { cost: 120, growth: 1.7, per: 60,   max: 10, label: "Energy max",     desc: "Larger spawn energy pool",           unlockLevel: 6 },
-      energyRegen:  { cost: 120, growth: 1.7, per: 10,   max: 10, label: "Energy regen",   desc: "Refills your energy faster",         unlockLevel: 8 },
-      burst:        { cost: 180, growth: 1.8, per: 2,    max: 8,  label: "Burst size",     desc: "More particles per tap",             unlockLevel: 10 },
-      pointMult:    { cost: 200, growth: 1.8, per: 0.15, max: 8,  label: "Score Boost",    desc: "Earn more points per particle",      unlockLevel: 12 },
+      burst:        { cost: 120, growth: 1.7, per: 2,    max: 10, label: "Burst size",     desc: "More particles per tap + hold",      unlockLevel: 2 },
+      energyMax:    { cost: 120, growth: 1.7, per: 60,   max: 10, label: "Energy max",     desc: "Larger spawn energy pool",           unlockLevel: 3 },
+      energyRegen:  { cost: 120, growth: 1.7, per: 10,   max: 10, label: "Energy regen",   desc: "Refills your energy faster",         unlockLevel: 4 },
+      capacity:     { cost: 150, growth: 1.6, per: 25,   max: 20, label: "Capacity",       desc: "More particles on screen",           unlockLevel: 5 },
+      pointMult:    { cost: 200, growth: 1.8, per: 0.15, max: 8,  label: "Score Boost",    desc: "Earn more points per particle",      unlockLevel: 8 },
+      attractForce: { cost: 160, growth: 1.7, per: 0.25, max: 8,  label: "Attract power",  desc: "Stronger pull for finer control",    unlockLevel: 11 },
     } as Record<string, { cost: number; growth: number; per: number; max: number; label: string; desc: string; unlockLevel: number }>,
   },
 
@@ -118,6 +118,7 @@ export const config = {
     flySpeed: 95, // px/s travel speed
     eatPerSec: 500, // max particles a blast special consumes per second (feeding cap)
     hitRadius: 95, // px radius within which a special consumes particles
+    minAppetite: 30, // floor so early tiny swarms still have a beatable target
   },
 
   // ---- audio ----
