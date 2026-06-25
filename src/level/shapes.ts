@@ -22,7 +22,16 @@ export interface TriangleShape {
   edges: Edge[];
 }
 
-export type Shape = CircleShape | TriangleShape;
+export interface WallShape {
+  kind: "wall";
+  x: number; // center
+  y: number;
+  hw: number; // half-width
+  hh: number; // half-height
+  edges: Edge[]; // 4 outward-normal edges (axis-aligned, so nx/ny are ±1 or 0)
+}
+
+export type Shape = CircleShape | TriangleShape | WallShape;
 
 /** Upside-down triangle matching the rendered clip-path: verts (x±r, y-r) and (x, y+r). */
 export function makeTriangle(x: number, y: number, r: number): TriangleShape {
@@ -48,6 +57,20 @@ export function makeTriangle(x: number, y: number, r: number): TriangleShape {
     edges.push({ nx, ny, c: nx * ax + ny * ay });
   }
   return { kind: "triangle", x, y, r, edges };
+}
+
+/** Axis-aligned rectangle (wall segment). Edges point outward along ±x/±y. */
+export function makeWall(x: number, y: number, hw: number, hh: number): WallShape {
+  return {
+    kind: "wall",
+    x, y, hw, hh,
+    edges: [
+      { nx: -1, ny: 0, c: -(x - hw) }, // left face, outward = -x, c = -(x - hw)
+      { nx: 1,  ny: 0, c: x + hw },    // right face
+      { nx: 0,  ny: -1, c: -(y - hh) }, // top face
+      { nx: 0,  ny: 1,  c: y + hh },   // bottom face
+    ],
+  };
 }
 
 /**
@@ -89,10 +112,40 @@ export function resolveShape(
   }
 
   // triangle: inside iff on the inner side of all edges
+  if (shape.kind === "triangle") {
+    const edges = shape.edges;
+    const e0 = edges[0];
+    const e1 = edges[1];
+    const e2 = edges[2];
+    for (let i = 0; i < count; i++) {
+      const x = px[i];
+      const y = py[i];
+      const d0 = e0.nx * x + e0.ny * y - e0.c;
+      if (d0 > 0) continue;
+      const d1 = e1.nx * x + e1.ny * y - e1.c;
+      if (d1 > 0) continue;
+      const d2 = e2.nx * x + e2.ny * y - e2.c;
+      if (d2 > 0) continue;
+      // inside: pick the nearest edge (largest d, closest to 0) and push out along it
+      let nx = e0.nx;
+      let ny = e0.ny;
+      let maxD = d0;
+      if (d1 > maxD) { maxD = d1; nx = e1.nx; ny = e1.ny; }
+      if (d2 > maxD) { maxD = d2; nx = e2.nx; ny = e2.ny; }
+      px[i] = x - maxD * nx;
+      py[i] = y - maxD * ny;
+      const vn = vx[i] * nx + vy[i] * ny;
+      if (vn < 0) { vx[i] -= bounce * vn * nx; vy[i] -= bounce * vn * ny; }
+    }
+    return;
+  }
+
+  // wall (axis-aligned rectangle): same edge push-out, 4 edges
   const edges = shape.edges;
   const e0 = edges[0];
   const e1 = edges[1];
   const e2 = edges[2];
+  const e3 = edges[3];
   for (let i = 0; i < count; i++) {
     const x = px[i];
     const y = py[i];
@@ -102,26 +155,17 @@ export function resolveShape(
     if (d1 > 0) continue;
     const d2 = e2.nx * x + e2.ny * y - e2.c;
     if (d2 > 0) continue;
-    // inside: pick the nearest edge (largest d, closest to 0) and push out along it
+    const d3 = e3.nx * x + e3.ny * y - e3.c;
+    if (d3 > 0) continue;
     let nx = e0.nx;
     let ny = e0.ny;
     let maxD = d0;
-    if (d1 > maxD) {
-      maxD = d1;
-      nx = e1.nx;
-      ny = e1.ny;
-    }
-    if (d2 > maxD) {
-      maxD = d2;
-      nx = e2.nx;
-      ny = e2.ny;
-    }
-    px[i] = x - maxD * nx; // maxD <= 0, so this moves outward to the edge
+    if (d1 > maxD) { maxD = d1; nx = e1.nx; ny = e1.ny; }
+    if (d2 > maxD) { maxD = d2; nx = e2.nx; ny = e2.ny; }
+    if (d3 > maxD) { maxD = d3; nx = e3.nx; ny = e3.ny; }
+    px[i] = x - maxD * nx;
     py[i] = y - maxD * ny;
     const vn = vx[i] * nx + vy[i] * ny;
-    if (vn < 0) {
-      vx[i] -= bounce * vn * nx;
-      vy[i] -= bounce * vn * ny;
-    }
+    if (vn < 0) { vx[i] -= bounce * vn * nx; vy[i] -= bounce * vn * ny; }
   }
 }

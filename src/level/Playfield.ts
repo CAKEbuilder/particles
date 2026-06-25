@@ -4,7 +4,7 @@
 // Particles are simulated in WebGL; these objects are DOM overlays + sim-side interaction.
 
 import type { CpuParticleSystem } from "../sim/CpuParticleSystem";
-import { makeTriangle, resolveShape, type Shape } from "./shapes";
+import { makeTriangle, makeWall, resolveShape, type Shape } from "./shapes";
 
 interface Portal {
   ax: number;
@@ -42,18 +42,24 @@ const PORTAL_OFF = [16, 28] as const;
 const TARGET_FIRST = 90;          // buff targets come later still
 const TARGET_EVERY = [28, 46] as const;
 const TARGET_LIFE = 16;
+const MAZE_FIRST = 120;           // maze corridors come after portals are established
+const MAZE_ON = [30, 45] as const;
+const MAZE_OFF = [20, 35] as const;
 
 // minimum thresholds before portals / buff targets can appear
 const PORTAL_MIN_LEVEL = 3;
 const PORTAL_MIN_COUNT = 300;
 const TARGET_MIN_LEVEL = 5;
 const TARGET_MIN_COUNT = 500;
+const MAZE_MIN_LEVEL = 7;
+const MAZE_MIN_COUNT = 600;
 
 const rand = (a: number, b: number): number => a + Math.random() * (b - a);
 
 export class Playfield {
   private portal: Portal | null = null;
   private obstacle: Obstacle | null = null;
+  private walls: Obstacle[] = []; // current maze wall segments
   private targets: Target[] = [];
   private enabled = false;
   private tutorial = false; // tutorial mode: one static obstacle only — no portals, targets, or reshaping
@@ -63,6 +69,8 @@ export class Playfield {
   private portalTimer = 0;
   private portalOn = false;
   private targetTimer = 0;
+  private mazeTimer = 0;
+  private mazeOn = false;
 
   throughput = 0; // particles teleported since last read
 
@@ -94,11 +102,14 @@ export class Playfield {
   private clear(): void {
     this.portal?.el.remove();
     this.obstacle?.el.remove();
+    for (const w of this.walls) w.el.remove();
     for (const t of this.targets) t.el.remove();
     this.portal = null;
     this.obstacle = null;
+    this.walls.length = 0;
     this.targets.length = 0;
     this.portalOn = false;
+    this.mazeOn = false;
   }
 
   /** Start state: one obstacle, no portal yet, target/portal scheduled for later. */
@@ -108,6 +119,7 @@ export class Playfield {
     this.obstacleTimer = rand(...OBSTACLE_CHANGE);
     this.portalTimer = PORTAL_FIRST;
     this.targetTimer = TARGET_FIRST;
+    this.mazeTimer = MAZE_FIRST;
   }
 
   relayout(): void {
@@ -153,12 +165,69 @@ export class Playfield {
     this.portal = { ax, ay, bx, by, r, el };
   }
 
+  // ---- maze corridors ----
+  /** Spawn a simple L-shaped or straight corridor from 2-3 wall segments plus a buff target at the open end. */
+  private spawnMaze(): void {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    // anchor in the mid-screen area
+    const cx = rand(w * 0.25, w * 0.75);
+    const cy = rand(h * 0.3, h * 0.65);
+    const thick = 12; // wall half-thickness (px)
+    const len = rand(80, 130); // wall half-length
+
+    // pick orientation: horizontal corridor or vertical
+    const horiz = Math.random() < 0.5;
+    const wallDefs: Array<[number, number, number, number]> = horiz
+      ? [
+          // top wall
+          [cx, cy - 36, len, thick],
+          // bottom wall
+          [cx, cy + 36, len, thick],
+        ]
+      : [
+          // left wall
+          [cx - 36, cy, thick, len],
+          // right wall
+          [cx + 36, cy, thick, len],
+        ];
+
+    for (const [wx, wy, hw, hh] of wallDefs) {
+      const shape = makeWall(wx, wy, hw, hh);
+      const el = document.createElement("div");
+      el.className = "obstacle obstacle-wall";
+      el.style.left = `${wx}px`;
+      el.style.top = `${wy}px`;
+      el.style.width = `${hw * 2}px`;
+      el.style.height = `${hh * 2}px`;
+      this.parent.appendChild(el);
+      this.walls.push({ shape, el });
+    }
+
+    // buff target at the open end of the corridor
+    const targetX = horiz ? cx + len + 28 : cx;
+    const targetY = horiz ? cy : cy + len + 28;
+    this.spawnTargetAt(targetX, targetY);
+  }
+
+  private clearMaze(): void {
+    for (const w of this.walls) w.el.remove();
+    this.walls.length = 0;
+  }
+
   // ---- buff targets ----
   private spawnTarget(): void {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const x = rand(w * 0.25, w * 0.75);
-    const y = rand(h * 0.25, h * 0.7);
+    this.spawnTargetAt(rand(w * 0.25, w * 0.75), rand(h * 0.25, h * 0.7));
+  }
+
+  private spawnTargetAt(x: number, y: number): void {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    // clamp to visible area
+    x = Math.max(60, Math.min(w - 60, x));
+    y = Math.max(60, Math.min(h - 120, y));
     const r = 38;
     const hp = 480;
     const el = document.createElement("div");
@@ -218,6 +287,23 @@ export class Playfield {
           this.targetTimer = rand(...TARGET_EVERY);
         }
       }
+
+      // maze corridors — latest gate; spawn a corridor + buff target at the end
+      const mazeReady = !this.levelGate || level >= MAZE_MIN_LEVEL || count >= MAZE_MIN_COUNT;
+      if (mazeReady) {
+        this.mazeTimer -= dt;
+        if (this.mazeTimer <= 0) {
+          if (this.mazeOn) {
+            this.clearMaze();
+            this.mazeOn = false;
+            this.mazeTimer = rand(...MAZE_OFF);
+          } else {
+            this.spawnMaze();
+            this.mazeOn = true;
+            this.mazeTimer = rand(...MAZE_ON);
+          }
+        }
+      }
     }
 
     this.applyInteractions(w, h);
@@ -251,6 +337,10 @@ export class Playfield {
 
     if (this.obstacle) {
       resolveShape(this.obstacle.shape, px, py, vx, vy, count, OBSTACLE_RESTITUTION);
+    }
+
+    for (const wall of this.walls) {
+      resolveShape(wall.shape, px, py, vx, vy, count, OBSTACLE_RESTITUTION);
     }
   }
 
