@@ -24,6 +24,7 @@ export class GameHud {
 
   private ascendBtn!: HTMLButtonElement;
   private shopBtn!: HTMLButtonElement;
+  private ascendModal: HTMLDivElement | null = null;
   private hero: HTMLDivElement;
   private heroPps: HTMLDivElement;
   private swarmCount: HTMLDivElement;
@@ -90,7 +91,7 @@ export class GameHud {
 
     this.shopBtn = document.createElement("button");
     this.shopBtn.className = "hud-btn gh-shop-btn hidden-ui";
-    this.shopBtn.innerHTML = `⚡ Buffs <span class="gh-deal">★</span>`;
+    this.shopBtn.innerHTML = `<span class="gh-ico" aria-hidden="true">&#9889;</span> Buffs <span class="gh-deal" aria-hidden="true">&#9733;</span>`;
     this.shopBtn.addEventListener("click", () => this.toggleShop());
     this.el.appendChild(this.shopBtn);
 
@@ -105,7 +106,7 @@ export class GameHud {
     shop.className = "gh-shop hidden-ui";
     const title = document.createElement("div");
     title.className = "gh-shop-title";
-    title.textContent = "Permanent buffs";
+    title.textContent = "Buffs";
     shop.appendChild(title);
 
     for (const id of Object.keys(config.game.buffs)) {
@@ -138,15 +139,55 @@ export class GameHud {
 
     this.ascendBtn = document.createElement("button");
     this.ascendBtn.className = "hud-btn gh-ascend hidden-ui";
-    this.ascendBtn.addEventListener("click", () => this.onAscend());
+    this.ascendBtn.addEventListener("click", () => this.showAscendConfirm());
     shop.appendChild(this.ascendBtn);
 
     return shop;
   }
 
+  private showAscendConfirm(): void {
+    if (this.ascendModal) return;
+    const next = Math.round((1 + (this.state.ascension + 1) * config.game.ascendBonus) * 100);
+    const modal = document.createElement("div");
+    modal.className = "gh-ascend-modal";
+    modal.innerHTML = `
+      <div class="gh-ascend-title">Ascend?</div>
+      <div class="gh-ascend-body">
+        <div class="gh-ascend-lose">You will lose:</div>
+        <ul class="gh-ascend-list">
+          <li>All points</li>
+          <li>Current level (back to 1)</li>
+          <li>All purchased buffs</li>
+        </ul>
+        <div class="gh-ascend-gain">You will keep permanently:</div>
+        <ul class="gh-ascend-list gh-ascend-list-good">
+          <li><b>${next}%</b> points from now on</li>
+          <li>All discoveries &amp; achievements</li>
+        </ul>
+      </div>
+      <div class="gh-ascend-btns">
+        <button class="hud-btn gh-ascend-cancel">Cancel</button>
+        <button class="hud-btn gh-ascend-confirm">Ascend</button>
+      </div>
+    `;
+    modal.querySelector(".gh-ascend-cancel")!.addEventListener("click", () => this.closeAscendConfirm());
+    modal.querySelector(".gh-ascend-confirm")!.addEventListener("click", () => {
+      this.closeAscendConfirm();
+      this.onAscend();
+    });
+    this.shop.appendChild(modal);
+    this.ascendModal = modal;
+  }
+
+  private closeAscendConfirm(): void {
+    this.ascendModal?.remove();
+    this.ascendModal = null;
+  }
+
   private toggleShop(): void {
     this.shopOpen = !this.shopOpen;
     this.shop.classList.toggle("hidden-ui", !this.shopOpen);
+    if (!this.shopOpen) this.closeAscendConfirm();
     if (this.shopOpen) this.refreshShop();
   }
 
@@ -176,7 +217,7 @@ export class GameHud {
     this.ascendBtn.classList.toggle("hidden-ui", !can);
     if (can) {
       const next = Math.round((1 + (this.state.ascension + 1) * config.game.ascendBonus) * 100);
-      this.ascendBtn.textContent = `✦ Ascend → ${next}% points (resets level & buffs)`;
+      this.ascendBtn.textContent = `Ascend → ${next}% points forever`;
     }
   }
 

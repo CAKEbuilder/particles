@@ -318,19 +318,34 @@ body {
 .gh-rate { color: var(--text-dim); font-size: 11px; font-weight: 600; }
 .gh-cap { color: var(--text-dim); }
 .gh-cap-val { color: var(--text); font-weight: 600; }
+/* icon glyph spans in buttons — explicit font + vertical align for cross-platform consistency */
+.gh-ico {
+  display: inline-block;
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 1em;
+  line-height: 1;
+  vertical-align: -0.05em;
+  font-style: normal;
+}
 .gh-shop-btn { align-self: flex-start; margin-top: 2px; }
 .gh-shop {
-  display: flex; flex-direction: column; gap: 6px;
+  display: flex; flex-direction: column; gap: 8px;
   margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--panel-border);
 }
 .gh-shop-title { color: var(--text-dim); font-weight: 700; letter-spacing: 0.05em; }
 .gh-shop-row { display: flex; align-items: center; gap: 8px; }
-.gh-shop-name-wrap { flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.gh-shop-name-wrap { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .gh-shop-name { font-weight: 600; }
 .gh-shop-desc { font-size: 10px; color: var(--text-dim); }
-.gh-shop-tier { color: var(--text-dim); font-variant-numeric: tabular-nums; }
-.gh-buy { font-size: 12px; padding: 6px 10px; min-height: 32px; min-width: 64px;
-  background: rgba(120, 180, 255, 0.12); border-color: var(--panel-border); }
+.gh-shop-tier {
+  color: var(--text-dim); font-variant-numeric: tabular-nums;
+  min-width: 28px; text-align: right; flex-shrink: 0;
+}
+.gh-buy {
+  font-size: 12px; padding: 6px 10px; min-height: 32px; width: 72px; flex-shrink: 0;
+  background: rgba(120, 180, 255, 0.12); border-color: var(--panel-border);
+  text-align: center;
+}
 .gh-buy:disabled { opacity: 0.4; cursor: default; }
 .gh-buy.affordable {
   color: #061018;
@@ -350,6 +365,33 @@ body {
   animation: deal-pulse 1.1s ease-in-out infinite;
 }
 @keyframes deal-pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+/* ascend confirm modal */
+.gh-ascend-modal {
+  background: rgba(5, 8, 20, 0.95);
+  border: 1px solid rgba(176, 107, 255, 0.4);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 10px;
+  box-shadow: 0 0 24px rgba(176, 107, 255, 0.2);
+}
+.gh-ascend-title { font-size: 15px; font-weight: 800; color: var(--text); }
+.gh-ascend-body { display: flex; flex-direction: column; gap: 6px; }
+.gh-ascend-lose { font-size: 11px; font-weight: 700; color: #ff8a8a; }
+.gh-ascend-gain { font-size: 11px; font-weight: 700; color: #3bff9e; }
+.gh-ascend-list {
+  margin: 0; padding-left: 16px;
+  font-size: 11px; color: var(--text-dim); display: flex; flex-direction: column; gap: 2px;
+}
+.gh-ascend-list-good { color: rgba(180, 255, 220, 0.85); }
+.gh-ascend-list b { color: #3bff9e; }
+.gh-ascend-btns { display: flex; gap: 8px; }
+.gh-ascend-cancel { flex: 1; background: rgba(255,255,255,0.06); border-color: var(--panel-border); font-size: 12px; }
+.gh-ascend-confirm {
+  flex: 1; font-size: 12px; font-weight: 700;
+  background: linear-gradient(135deg, #b06bff, #7b35d0);
+  border-color: transparent; color: #fff;
+  box-shadow: 0 0 12px rgba(176, 107, 255, 0.4);
+}
 
 /* ---- collection screen ---- */
 .collection-screen {
