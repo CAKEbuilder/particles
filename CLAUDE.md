@@ -115,6 +115,21 @@ git add <files>
 git commit -m "short description"
 ```
 
+## GitHub / deployment
+
+The remote is `https://github.com/CAKEbuilder/particles` (public repo). Pushing to `main` triggers a GitHub Actions deploy to `https://cakebuilder.github.io/particles/`.
+
+**Never `git push` unless Connor explicitly asks.** Local commits are always fine; pushing is a separate deliberate step.
+
+Before pushing, always verify:
+- No secrets, API keys, tokens, or credentials in staged files
+- No `.env` files or local config with private values
+- No personal data beyond what was already public
+
+```bash
+git push origin main   # only run when explicitly instructed
+```
+
 ## Conventions
 
 - **All tunables live in `src/config.ts`** (sim, spawn, forces, look, game economy, specials,
