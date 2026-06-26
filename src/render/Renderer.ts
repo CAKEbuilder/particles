@@ -5,6 +5,7 @@ import { config } from "../config";
 import { perf } from "../core/Profiler";
 import { QUAD_STRIP } from "./geometry";
 import { BLIT_FS, BLIT_VS, PARTICLE_FS, PARTICLE_VS } from "./shaders";
+import { diagnoseGlFailure, type GlDiagnostic } from "./glDiagnostics";
 import type { ParticleSystem } from "../sim/ParticleSystem";
 
 const INSTANCE_STRIDE = 6; // x, y, size, angle, hue, alpha
@@ -41,7 +42,8 @@ export class Renderer {
   private lost = false; // true while the GL context is lost
 
   constructor(canvas: HTMLCanvasElement, capacity: number) {
-    const gl = canvas.getContext("webgl2", {
+    // Preferred: full options including high-performance GPU selection
+    let gl = canvas.getContext("webgl2", {
       alpha: false,
       antialias: false,
       depth: false,
@@ -49,7 +51,16 @@ export class Renderer {
       premultipliedAlpha: false,
       powerPreference: "high-performance",
     });
-    if (!gl) throw new Error("WebGL2 is not supported on this device/browser.");
+    if (!gl) {
+      // Retry with minimal options — some drivers reject powerPreference:"high-performance"
+      gl = canvas.getContext("webgl2", { alpha: false, antialias: false, depth: false, stencil: false });
+    }
+    if (!gl) {
+      const diag = diagnoseGlFailure(canvas);
+      const err = new Error(diag.suggestion) as Error & { glDiagnostic: GlDiagnostic };
+      err.glDiagnostic = diag;
+      throw err;
+    }
     this.gl = gl;
     this.instanceData = new Float32Array(capacity * INSTANCE_STRIDE);
 
