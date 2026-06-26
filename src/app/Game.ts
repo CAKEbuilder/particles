@@ -22,6 +22,7 @@ import { TIERS } from "../specials/Rarity";
 import { PowerUps } from "../game/PowerUps";
 import { Playfield } from "../level/Playfield";
 import { Coach } from "../ui/Coach";
+import { ToyHint } from "../ui/ToyHint";
 import { PauseOverlay } from "../ui/PauseOverlay";
 import { Toast } from "../ui/Toast";
 import { ProgressOverlay } from "../ui/ProgressOverlay";
@@ -60,6 +61,7 @@ export class Game {
   private powerups = new PowerUps();
   private playfield: Playfield;
   private coach: Coach;
+  private toyHint: ToyHint;
   private toast: Toast;
   private pauseOverlay: PauseOverlay;
   private paused = false;
@@ -68,12 +70,6 @@ export class Game {
   private lastGovern = performance.now();
   private lastSave = performance.now();
   private portalAccum = 0; // particles teleported toward the next power-up
-  private tutorialStep = 0;
-  private tutorialTimer = 0;
-  private tutorialStep2Phase: 0 | 1 | 2 = 0; // attract-lesson sub-state
-  private tutorialPhaseTimer = 0; // timer within an attract sub-phase
-  private tutorialLvl2Seen = false;
-  private tutorialLvl2Timer = 0;
 
   constructor(canvas: HTMLCanvasElement, uiRoot: HTMLElement) {
     this.system = new CpuParticleSystem(this.device.capacity);
@@ -126,6 +122,7 @@ export class Game {
       Haptics.unlock();
     });
     this.coach = new Coach(uiRoot);
+    this.toyHint = new ToyHint(uiRoot);
     this.toast = new Toast(uiRoot);
     this.pauseOverlay = new PauseOverlay(uiRoot, {
       onResume: () => this.resume(),
@@ -284,6 +281,7 @@ export class Game {
     this.collection.setVisible(false);
     this.progress.setVisible(false);
     this.coach.setVisible(false);
+    this.toyHint.hide();
 
     const [w, h] = [window.innerWidth, window.innerHeight];
 
@@ -314,6 +312,8 @@ export class Game {
           this.save.data.firstPlayDone = true;
           this.save.persist();
         }
+        // Wordless first-touch invitation — pulses until the player's first tap
+        this.toyHint.show();
         break;
 
       case "sandbox":
@@ -339,28 +339,7 @@ export class Game {
         this.gameHud.setVisible(true);
         this.gameHud.update();
 
-        if (!this.save.data.firstPlayDone) {
-          if (this.save.data.level >= 2) {
-            // Player already has gameplay progress (e.g. reload mid-tutorial) — skip ahead
-            this.save.data.firstPlayDone = true;
-            this.save.persist();
-          } else {
-            // Tutorial: lock down playfield + specials; player spawns the first particle themselves
-            this.specials.setEnabled(false);
-            this.playfield.setEnabled(false);
-            this.tutorialStep = 0;
-            this.tutorialTimer = 0;
-            this.tutorialStep2Phase = 0;
-            this.tutorialPhaseTimer = 0;
-            this.tutorialLvl2Seen = false;
-            this.tutorialLvl2Timer = 0;
-            this.input.burstSize = 1; // one particle per tap so the lesson lands
-            this.gameHud.setReveal(0); // start with counter only
-            this.hud.setTutorialTools(["spawn"]); // only Spawn visible at start
-            this.hud.setStatsVisible(false); // hide fps/count readout during tutorial
-            this.coach.show("Tap the screen ✦");
-          }
-        }
+        this.gameHud.setReveal(3); // full UI — no staged reveal, players come from toy or title
         this.hud.updateUnlocks(this.save.data.level);
         break;
       }
@@ -386,124 +365,6 @@ export class Game {
     }
   }
 
-  /** True if any live particle is inside the radius of an active force point. */
-  private particleNearForce(): boolean {
-    const forces = this.input.getForces();
-    if (forces.length === 0) return false;
-    const { px, py, count } = this.system;
-    for (const f of forces) {
-      const r2 = f.radius * f.radius;
-      for (let i = 0; i < count; i++) {
-        const dx = px[i] - f.x;
-        const dy = py[i] - f.y;
-        if (dx * dx + dy * dy < r2) return true;
-      }
-    }
-    return false;
-  }
-
-  /** Tutorial script that runs during the first game session (until firstPlayDone is set). */
-  private tutorialUpdate(dt: number): void {
-    this.tutorialTimer += dt;
-    switch (this.tutorialStep) {
-      case 0: // wait for first particle
-        if (this.system.count >= 1) {
-          this.advanceTutorial(1);
-          this.coach.show("Tap again ◆");
-        }
-        break;
-
-      case 1: // a couple more taps; require a minimum pause before revealing attract
-        if ((this.system.count >= 3 && this.tutorialTimer > 2) || this.tutorialTimer > 25) {
-          this.advanceTutorial(2);
-          this.tutorialStep2Phase = 0;
-          this.tutorialPhaseTimer = 0;
-          this.gameHud.setReveal(1); // show level + XP bar
-          this.hud.setTutorialTools(["spawn", "attract"]); // reveal Attract
-          this.hud.highlightTool("attract"); // pulse to draw attention
-          this.coach.show("Tap ◉ Attract");
-        }
-        break;
-
-      case 2: { // attract lesson — player taps attract, holds near particles, then auto-advances
-        this.tutorialPhaseTimer += dt;
-        if (this.tutorialStep2Phase === 0 && this.input.tool === "attract") {
-          // player selected attract — remove highlight, prompt to hold
-          this.tutorialStep2Phase = 1;
-          this.tutorialPhaseTimer = 0;
-          this.hud.highlightTool(null);
-          this.coach.show("Hold the screen — pull them close ◉");
-        } else if (this.tutorialStep2Phase === 1 && this.input.getForces().length > 0 && this.particleNearForce()) {
-          // only advance once a particle is actually inside the attract radius
-          this.tutorialStep2Phase = 2;
-          this.tutorialPhaseTimer = 0;
-        } else if (this.tutorialStep2Phase === 2 &&
-                   (this.input.getForces().length === 0 || this.tutorialPhaseTimer >= 3)) {
-          // player released or held long enough — spawn more particles and advance
-          this.hud.highlightTool(null);
-          this.tutorialStep2Phase = 0;
-          const [w2, h2] = [window.innerWidth, window.innerHeight];
-          this.system.spawnBurst(w2 / 2, h2 / 2, { count: 20, speed: 200, speedJitter: 120 });
-          this.advanceTutorial(3);
-          this.coach.show("Particles score — movement earns more ✦");
-        }
-        // timeout fallback: if stuck (e.g. no particles near hold point), push forward
-        if (this.tutorialStep === 2 && this.tutorialTimer > 50) {
-          this.hud.highlightTool(null);
-          this.tutorialStep2Phase = 0;
-          const [wt, ht] = [window.innerWidth, window.innerHeight];
-          this.system.spawnBurst(wt / 2, ht / 2, { count: 20, speed: 200, speedJitter: 120 });
-          this.advanceTutorial(3);
-          this.coach.show("Particles score — movement earns more ✦");
-        }
-        break;
-      }
-
-      case 3: { // move-to-earn lesson; wait for level 2, then reveal obstacle
-        // first time level 2 is reached: flash a message and spawn a burst to make it tangible
-        if (!this.tutorialLvl2Seen && this.state.level >= 2) {
-          this.tutorialLvl2Seen = true;
-          this.tutorialLvl2Timer = 0;
-          this.coach.show("Level 2 — your swarm can grow ✦");
-          const [wl, hl] = [window.innerWidth, window.innerHeight];
-          this.system.spawnBurst(wl / 2, hl / 2, { count: 15, speed: 220, speedJitter: 130 });
-        }
-        if (this.tutorialLvl2Seen) this.tutorialLvl2Timer += dt;
-        if ((this.tutorialLvl2Seen && this.tutorialLvl2Timer >= 3) || this.tutorialTimer > 48) {
-          this.advanceTutorial(4);
-          this.gameHud.setReveal(2); // show energy + points now that they've earned a level
-          this.playfield.setTutorial(true); // one static obstacle only — no portals/targets yet
-          this.playfield.setEnabled(true);
-          this.coach.setVisible(false); // let the obstacle speak for itself
-        }
-        break;
-      }
-
-      case 4: // obstacle discovery phase, then hand off to the real game
-        if (this.tutorialTimer > 30) {
-          this.save.data.firstPlayDone = true;
-          this.save.persist();
-          this.playfield.setTutorial(false); // portals + buff targets now resume (level-gated)
-          this.specials.setEnabled(true); // visitors allowed now, but gated by swarm size
-          this.gameHud.setReveal(3); // full UI
-          this.hud.setTutorialTools(null); // restore normal unlock behaviour
-          this.hud.updateUnlocks(this.save.data.level);
-          this.hud.setStatsVisible(true);
-          this.coach.show("You're ready — grow your swarm ✦");
-          this.tutorialStep = 5;
-          setTimeout(() => {
-            if (this.mode === "game") this.coach.setVisible(false);
-          }, 4000);
-        }
-        break;
-    }
-  }
-
-  private advanceTutorial(step: number): void {
-    this.tutorialStep = step;
-    this.tutorialTimer = 0;
-  }
-
   private ambientBloom(w: number, h: number): void {
     this.system.spawnBurst(w / 2, h / 2, {
       count: Math.min(800, Math.floor(this.device.capacity * 0.05)),
@@ -517,7 +378,7 @@ export class Game {
 
     // Continuous particle size: big solo, shrinks smoothly as count grows, tiny in thousands.
     // Runs in game + sandbox + intro so the curve is consistent across all playable modes.
-    if (this.mode === "game" || this.mode === "sandbox" || this.mode === "intro") {
+    if (this.mode === "game" || this.mode === "toy" || this.mode === "sandbox" || this.mode === "intro") {
       const n = this.system.count;
       const sc = config.spawn.sizeByCount;
       const sz = sc.min + (sc.max - sc.min) / (1 + n / sc.k);
@@ -528,11 +389,8 @@ export class Game {
     if (this.mode === "game") {
       // Must be set before input.update so tap handlers on this frame see the right values
       this.system.softCap = this.state.maxCapacity;
-      const burst = !this.save.data.firstPlayDone && this.tutorialStep <= 1
-        ? 1
-        : this.state.burstSize;
-      this.input.burstSize = burst;
-      this.input.streamRate = burst; // holding spawn = same rate as burst (1/sec until buff unlocked)
+      this.input.burstSize = this.state.burstSize;
+      this.input.streamRate = this.state.burstSize; // holding spawn = same rate as burst (1/sec until buff unlocked)
       this.input.attractMult = this.state.attractMult;
     }
 
@@ -564,9 +422,6 @@ export class Game {
         this.powerups.grantRandom();
       }
     }
-
-    // tutorial script runs only during first game session
-    if (this.mode === "game" && !this.save.data.firstPlayDone) this.tutorialUpdate(dt);
 
     const events = this.system.drainEvents();
     if (events.length) {

@@ -849,6 +849,45 @@ body {
 }
 .coach-btn { pointer-events: auto; }
 
+/* ---- toy-mode first-touch hint ---- */
+.toy-hint {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 3;
+  transition: opacity 0.4s ease;
+}
+.toy-hint--out { opacity: 0; }
+.toy-hint-ring {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  opacity: 0;
+  animation: toy-hint-pulse 2.4s ease-out infinite;
+}
+.toy-hint-ring--b { animation-delay: 1.2s; }
+.toy-hint-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 18px 6px var(--accent);
+  animation: toy-hint-dot-breathe 2.4s ease-in-out infinite;
+}
+@keyframes toy-hint-pulse {
+  0%   { transform: scale(0.4); opacity: 0.7; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+@keyframes toy-hint-dot-breathe {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.2); }
+}
+
 /* ---- toasts ---- */
 .toasts {
   /* bottom-center, above the toolbar; newest sits just above it, older rise */
