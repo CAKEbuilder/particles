@@ -132,6 +132,15 @@ export const config = {
     journeyRainbowMult: 2.0, // points multiplier for tinted particles in Journey
   },
 
+  // ---- sandbox editor ----
+  editor: {
+    lineThickness: 5,   // half-thickness of drawn lines (px)
+    snapGrid: 20,       // px grid for endpoint/center snapping
+    snapAngleDeg: 15,   // angle snap increment (includes H/V)
+    restitution: 0.7,   // bounce off editor walls
+    handleRadius: 14,   // px hit-test radius for endpoint/resize handles
+  },
+
   // ---- audio ----
   audio: {
     bpm: 84, // quantization tempo for note triggers

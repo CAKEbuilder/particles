@@ -21,6 +21,8 @@ export class Input {
   burstSize = config.spawn.burst; // overridden by game progression
   streamRate = config.spawn.streamPerSec;
   attractMult = 1; // overridden per-frame by GameState in game mode
+  /** When true (sandbox editor is active), all pointer events are ignored so the editor can own them. */
+  suspended = false;
   /** Optional gate: given a requested spawn count, returns how many are allowed
    *  (after capacity + energy), consuming resources. null = unlimited (sandbox). */
   gate: ((requested: number) => number) | null = null;
@@ -50,6 +52,7 @@ export class Input {
   }
 
   private onDown = (e: PointerEvent): void => {
+    if (this.suspended) return;
     e.preventDefault();
     this.engine.init();
     this.engine.resume();
@@ -75,6 +78,7 @@ export class Input {
   };
 
   private onMove = (e: PointerEvent): void => {
+    if (this.suspended) return;
     const p = this.pointers.get(e.pointerId);
     if (!p) return;
     e.preventDefault();
@@ -89,6 +93,7 @@ export class Input {
 
   /** Called once per fixed step: translate active pointers into forces / spawns. */
   update(dt: number): void {
+    if (this.suspended) return;
     const fp = this.forcePoints;
     fp.length = 0;
     this.toolSoundTimer -= dt * 1000;

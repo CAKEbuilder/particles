@@ -19,6 +19,7 @@ const TOOLS: { tool: Tool; label: string; unlockLevel: number }[] = [
 export interface HudOptions {
   onMenu: () => void;
   onTilt: () => Promise<boolean> | boolean; // toggle tilt gravity; returns new enabled state
+  onSelectTool?: () => void; // called whenever a play tool is selected (lets editor deactivate)
 }
 
 export class Hud {
@@ -85,6 +86,7 @@ export class Hud {
   private selectTool(tool: Tool): void {
     this.input.tool = tool;
     for (const [t, btn] of this.toolButtons) btn.classList.toggle("active", t === tool);
+    this.opts.onSelectTool?.();
   }
 
   private toggleGravity(): void {

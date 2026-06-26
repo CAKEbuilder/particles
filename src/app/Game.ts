@@ -30,6 +30,7 @@ import { ACHIEVEMENTS, checkAchievements } from "../game/achievements";
 import { Haptics, setHapticsEnabled } from "../core/haptics";
 import { Tilt } from "../core/Tilt";
 import { Visitors } from "../level/Visitors";
+import { SandboxEditor } from "../editor/SandboxEditor";
 
 export type Mode = "title" | "toy" | "sandbox" | "game" | "collection" | "intro" | "progress";
 
@@ -69,6 +70,7 @@ export class Game {
   private tilt = new Tilt();
   private mode: Mode = "title";
   private visitors: Visitors | null = null;
+  private editor: SandboxEditor;
   private lastGovern = performance.now();
   private lastSave = performance.now();
   private portalAccum = 0; // particles teleported toward the next power-up
@@ -99,6 +101,7 @@ export class Game {
       onCollection: () => this.setMode("collection"),
       onProgress: () => this.setMode("progress"),
     });
+    this.editor = new SandboxEditor(uiRoot, canvas, this.system, this.input);
     this.hud = new Hud(uiRoot, this.input, this.system, this.loop, {
       onMenu: () => this.onMenuPressed(),
       onTilt: async () => {
@@ -110,6 +113,7 @@ export class Game {
         if (!ok) this.toast.show("Tilt unavailable", "Motion access denied", "ach");
         return ok;
       },
+      onSelectTool: () => this.editor.onPlayToolSelected(),
     });
     this.gameHud = new GameHud(uiRoot, this.state, this.powerups, () => this.ascend());
     this.collection = new CollectionOverlay(uiRoot, {
@@ -276,7 +280,8 @@ export class Game {
     this.system.hueHi = 1;
     this.system.spawnRainbow = false;
     this.specials.setEnabled(mode === "game" || mode === "intro");
-    this.playfield.setEnabled(mode === "game" || mode === "sandbox" || mode === "intro");
+    this.playfield.setEnabled(mode === "game" || mode === "intro");
+    this.editor.setActive(mode === "sandbox");
     // toy is pure sensory: no economy, no obstacles, no specials (both already false above)
     if (mode !== "game" && mode !== "intro") this.powerups.clear();
     this.title.setVisible(false);
@@ -460,6 +465,7 @@ export class Game {
 
     this.system.step(dt);
     this.playfield.update(dt, this.state.level, this.system.count);
+    this.editor.resolve(dt);
 
     // pushing enough particles through portals earns a power-up
     if (this.mode === "game") {
