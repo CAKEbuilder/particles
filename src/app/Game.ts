@@ -29,7 +29,7 @@ import { ACHIEVEMENTS, checkAchievements } from "../game/achievements";
 import { Haptics, setHapticsEnabled } from "../core/haptics";
 import { Tilt } from "../core/Tilt";
 
-export type Mode = "title" | "sandbox" | "game" | "collection" | "intro" | "progress";
+export type Mode = "title" | "toy" | "sandbox" | "game" | "collection" | "intro" | "progress";
 
 // Tool labels for unlock toasts (excludes spawn/attract which are always available)
 const UNLOCK_TOASTS: { key: string; label: string }[] = [
@@ -95,7 +95,8 @@ export class Game {
 
     // overlays
     this.title = new TitleOverlay(uiRoot, {
-      onStart: () => this.setMode("game"),
+      onPlay: () => this.setMode("toy"),
+      onJourney: () => this.setMode("game"),
       onSandbox: () => this.setMode("sandbox"),
       onCollection: () => this.setMode("collection"),
       onProgress: () => this.setMode("progress"),
@@ -137,7 +138,7 @@ export class Game {
         this.save.reset();
         setHapticsEnabled(this.save.data.settings.haptics);
         this.engine.setMuted(this.save.data.settings.muted);
-        this.setMode("game"); // tutorial runs since firstPlayDone is now false
+        this.setMode("toy"); // start fresh in the calm toy after a reset
       },
       onToggleHaptics: (on) => {
         this.save.data.settings.haptics = on;
@@ -217,8 +218,9 @@ export class Game {
   start(): void {
     this.loop.start();
     this.lockPortrait();
-    // first-time players go straight into game (tutorial runs there); returning players see title
-    this.setMode(this.save.data.firstPlayDone ? "title" : "game");
+    // All players start in the calm toy — no forced progression on first launch.
+    // Returning players still see title (firstPlayDone gets set on first toy entry).
+    this.setMode(this.save.data.firstPlayDone ? "title" : "toy");
   }
 
   private lockPortrait(): void {
@@ -274,6 +276,7 @@ export class Game {
     this.system.spawnRainbow = false;
     this.specials.setEnabled(mode === "game" || mode === "intro");
     this.playfield.setEnabled(mode === "game" || mode === "sandbox" || mode === "intro");
+    // toy is pure sensory: no economy, no obstacles, no specials (both already false above)
     if (mode !== "game" && mode !== "intro") this.powerups.clear();
     this.title.setVisible(false);
     this.hud.setVisible(false);
@@ -293,6 +296,24 @@ export class Game {
         this.input.streamRate = config.spawn.streamPerSec;
         this.ambientBloom(w, h);
         this.title.setVisible(true);
+        break;
+
+      case "toy":
+        // Calm, economy-free particle toy. No energy gate, no specials, no obstacles,
+        // no score/level HUD. First contact: satisfying to touch, nothing to fail at.
+        config.gravityEnabled = false;
+        this.input.gate = null;
+        this.system.softCap = this.device.capacity;
+        this.input.burstSize = config.spawn.burst;
+        this.input.streamRate = config.spawn.streamPerSec;
+        this.hud.setVisible(true);
+        this.hud.showAllTools();
+        this.hud.setStatsVisible(false);
+        // Mark firstPlayDone so Journey mode doesn't run the old text tutorial
+        if (!this.save.data.firstPlayDone) {
+          this.save.data.firstPlayDone = true;
+          this.save.persist();
+        }
         break;
 
       case "sandbox":
