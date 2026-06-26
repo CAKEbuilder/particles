@@ -114,17 +114,19 @@ export class CpuParticleSystem implements ParticleSystem {
     return removed;
   }
 
-  /** Softly tint particles near (x, y). tintT is 0..1 intensity; uses quadratic falloff
-   *  so there is no hard edge — particles near the center get full tint, edge particles get ~0. */
+  /** Softly tint non-rainbow particles near (x, y). tintT is 0..1 intensity; quadratic
+   *  falloff so there is no hard edge. Rainbow-buffed particles are left untouched. */
   tintNear(x: number, y: number, radius: number): void {
     const r2 = radius * radius;
+    const maxStrength = 0.35; // cap so the tint is a subtle shimmer, not a full colour takeover
     for (let i = 0; i < this.count; i++) {
+      if (this.rainbowFlag[i]) continue; // never override permanent rainbow buff
       const dx = this.px[i] - x;
       const dy = this.py[i] - y;
       const d2 = dx * dx + dy * dy;
       if (d2 < r2) {
-        const t = d2 / r2;                    // 0 = centre, 1 = edge
-        const strength = (1 - t) * (1 - t);   // quadratic: 1 at centre, 0 at edge, smooth
+        const t = d2 / r2;                              // 0 = centre, 1 = edge
+        const strength = (1 - t) * (1 - t) * maxStrength; // quadratic falloff, capped
         if (this.tintT[i] < strength) this.tintT[i] = strength;
       }
     }
@@ -252,26 +254,26 @@ export class CpuParticleSystem implements ParticleSystem {
         hr -= Math.floor(hr);
         hue[i] = hr;
         alpha[i] = 0.92 + Math.min(0.08, speed * 0.0005);
-      } else if (rainbow[i] || tintT[i] > 0) {
-        // rainbow buff or temporary tint from blast
-        let blend = 1.0; // rainbow flag = always full rainbow
-        if (tintT[i] > 0) {
-          tintT[i] = Math.max(0, tintT[i] - tintDecay);
-          blend = tintT[i]; // 0..1 — fades smoothly back to normal hue
-          tinted++;
-        }
+      } else if (rainbow[i]) {
+        // permanent rainbow buff — always full rainbow, never overridden by tint
+        if (tintT[i] > 0) tintT[i] = 0; // clear any stale tint on rainbow particles
         let hr = rainbowPhase + (px[i] + py[i]) * 0.0026;
         hr -= Math.floor(hr);
-        if (blend < 1) {
-          // blend rainbow toward normal hue as tint fades
-          let hv = hueOffset + (px[i] + py[i]) * hueByPos + speed * hueBySpeed;
-          hv -= Math.floor(hv);
-          const hn = hueLo + hv * hueSpan;
-          hue[i] = hn + blend * (hr - hn);
-        } else {
-          hue[i] = hr;
-        }
-        alpha[i] = 0.55 + Math.min(0.55, speed * 0.0016) + blend * 0.12;
+        hue[i] = hr;
+        alpha[i] = 0.55 + Math.min(0.55, speed * 0.0016);
+      } else if (tintT[i] > 0) {
+        // temporary shimmer from rainbow blast (non-rainbow, non-holo only)
+        tintT[i] = Math.max(0, tintT[i] - tintDecay);
+        const blend = tintT[i]; // 0..1, fades smoothly back to normal
+        tinted++;
+        let hr = rainbowPhase + (px[i] + py[i]) * 0.0026;
+        hr -= Math.floor(hr);
+        // blend rainbow hue toward normal as tint fades
+        let hv = hueOffset + (px[i] + py[i]) * hueByPos + speed * hueBySpeed;
+        hv -= Math.floor(hv);
+        const hn = hueLo + hv * hueSpan;
+        hue[i] = hn + blend * (hr - hn);
+        alpha[i] = 0.55 + Math.min(0.55, speed * 0.0016) + blend * 0.08;
       } else {
         let hv = hueOffset + (px[i] + py[i]) * hueByPos + speed * hueBySpeed;
         hv -= Math.floor(hv);
