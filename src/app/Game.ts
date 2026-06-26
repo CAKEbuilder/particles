@@ -29,6 +29,7 @@ import { ProgressOverlay } from "../ui/ProgressOverlay";
 import { ACHIEVEMENTS, checkAchievements } from "../game/achievements";
 import { Haptics, setHapticsEnabled } from "../core/haptics";
 import { Tilt } from "../core/Tilt";
+import { Visitors } from "../level/Visitors";
 
 export type Mode = "title" | "toy" | "sandbox" | "game" | "collection" | "intro" | "progress";
 
@@ -67,6 +68,7 @@ export class Game {
   private paused = false;
   private tilt = new Tilt();
   private mode: Mode = "title";
+  private visitors: Visitors | null = null;
   private lastGovern = performance.now();
   private lastSave = performance.now();
   private portalAccum = 0; // particles teleported toward the next power-up
@@ -202,6 +204,8 @@ export class Game {
       this.notify("New colour unlocked", `Spectrum ${s}/${config.spectrumMax}`, "ach");
       Haptics.unlock();
     };
+
+    this.visitors = new Visitors(uiRoot, this.system);
 
     this.resize();
     window.addEventListener("resize", () => this.resize());
@@ -429,6 +433,18 @@ export class Game {
 
     if (this.mode === "game") {
       this.state.update(dt, this.system.count, this.system.avgSpeed);
+      // Rainbow-blast tinted particles earn a brief point bonus in Journey
+      if (this.system.tintedCount > 0) {
+        const bonus = this.system.tintedCount *
+          this.state.pointRate(this.system.avgSpeed) *
+          (config.visitors.journeyRainbowMult - 1) * dt;
+        this.save.data.points += bonus;
+        this.save.data.totalPoints += bonus;
+      }
+    }
+    // Peaceful visitors run in toy and Journey (not sandbox/intro — less clutter)
+    if (this.mode === "toy" || this.mode === "game") {
+      this.visitors?.update(dt);
     }
     if (this.mode === "game" || this.mode === "intro") {
       this.powerups.update(dt);

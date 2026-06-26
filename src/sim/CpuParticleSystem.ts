@@ -9,8 +9,8 @@ import { SpatialHash } from "./SpatialHash";
 import type { ForcePoint, ParticleSystem, SimEvent, SpawnOptions } from "./ParticleSystem";
 
 export class CpuParticleSystem implements ParticleSystem {
-  readonly capacity: number; // hard ceiling (allocated array size)
-  softCap: number; // runtime cap (game mode); = capacity in sandbox
+  readonly capacity: number;
+  softCap: number;
   count = 0;
 
   readonly px: Float32Array;
@@ -19,16 +19,20 @@ export class CpuParticleSystem implements ParticleSystem {
   readonly vy: Float32Array;
   readonly size: Float32Array;
   readonly angle: Float32Array;
-  readonly hue: Float32Array; // display hue (position + drift + speed), read by the renderer
+  readonly hue: Float32Array;
   readonly alpha: Float32Array;
-  private readonly rainbowFlag: Uint8Array; // per-particle: spawned during a rainbow buff
+  private readonly rainbowFlag: Uint8Array;
+  readonly holo: Uint8Array;    // persistent holographic flag
+  readonly tintT: Float32Array; // seconds of temporary rainbow-blast tint remaining
 
-  // hue band [hueLo,hueHi] the spatial gradient maps into (colour-spectrum unlocks widen it)
   hueLo = 0;
   hueHi = 1;
-  spawnRainbow = false; // while true, new spawns are full-spectrum rainbow
+  spawnRainbow = false;
 
-  avgSpeed = 0; // mean particle speed (px/s) over the last step; drives the movement-points bonus
+  avgSpeed = 0;
+  tintedCount = 0; // particles with tintT > 0 (updated each step)
+  holoCount = 0;   // particles with holo=1 (updated each step)
+
   private w = 1;
   private h = 1;
   private forcePoints: ForcePoint[] = [];
@@ -50,6 +54,8 @@ export class CpuParticleSystem implements ParticleSystem {
     this.hue = new Float32Array(capacity);
     this.alpha = new Float32Array(capacity);
     this.rainbowFlag = new Uint8Array(capacity);
+    this.holo = new Uint8Array(capacity);
+    this.tintT = new Float32Array(capacity);
     this.grid = new SpatialHash(config.separation.radius);
   }
 
@@ -77,15 +83,16 @@ export class CpuParticleSystem implements ParticleSystem {
       this.vy[i] = Math.sin(a) * sp;
       this.size[i] = config.spawn.size + Math.random() * config.spawn.sizeJitter;
       this.angle[i] = Math.random() * Math.PI * 2;
-      this.hue[i] = 0; // computed each step
+      this.hue[i] = 0;
       this.alpha[i] = 1;
       this.rainbowFlag[i] = this.spawnRainbow ? 1 : 0;
+      this.holo[i] = 0;
+      this.tintT[i] = 0;
     }
   }
 
   eraseNear(x: number, y: number, radius: number): void {
     const r2 = radius * radius;
-    // iterate from the end so swap-remove is safe
     for (let i = this.count - 1; i >= 0; i--) {
       const dx = this.px[i] - x;
       const dy = this.py[i] - y;
@@ -93,7 +100,6 @@ export class CpuParticleSystem implements ParticleSystem {
     }
   }
 
-  /** Remove up to `maxCount` particles within radius; returns how many were consumed. */
   consumeNear(x: number, y: number, radius: number, maxCount: number): number {
     const r2 = radius * radius;
     let removed = 0;
@@ -108,6 +114,54 @@ export class CpuParticleSystem implements ParticleSystem {
     return removed;
   }
 
+  /** Mark particles within radius as temporarily tinted for `seconds` (refreshes existing tint). */
+  tintNear(x: number, y: number, radius: number, seconds: number): void {
+    const r2 = radius * radius;
+    for (let i = 0; i < this.count; i++) {
+      const dx = this.px[i] - x;
+      const dy = this.py[i] - y;
+      if (dx * dx + dy * dy <= r2) {
+        if (this.tintT[i] < seconds) this.tintT[i] = seconds;
+      }
+    }
+  }
+
+  /** Make a single random particle holographic. */
+  makeHoloRandom(): void {
+    if (this.count === 0) return;
+    this.holo[Math.floor(Math.random() * this.count)] = 1;
+  }
+
+  /** Make all particles within radius holographic. */
+  makeHoloNear(x: number, y: number, radius: number): void {
+    const r2 = radius * radius;
+    for (let i = 0; i < this.count; i++) {
+      const dx = this.px[i] - x;
+      const dy = this.py[i] - y;
+      if (dx * dx + dy * dy <= r2) this.holo[i] = 1;
+    }
+  }
+
+  /** Spread holographic flag to nearby non-holo particles; `maxInfect` caps new infections. */
+  infectHolo(infectRadius: number, maxInfect: number): void {
+    const r2 = infectRadius * infectRadius;
+    let infected = 0;
+    const n = this.count;
+    for (let i = 0; i < n && infected < maxInfect; i++) {
+      if (this.holo[i]) continue;
+      for (let j = 0; j < n; j++) {
+        if (!this.holo[j]) continue;
+        const dx = this.px[i] - this.px[j];
+        const dy = this.py[i] - this.py[j];
+        if (dx * dx + dy * dy < r2) {
+          this.holo[i] = 1;
+          infected++;
+          break;
+        }
+      }
+    }
+  }
+
   private swapRemove(i: number): void {
     const last = --this.count;
     if (i !== last) {
@@ -120,11 +174,15 @@ export class CpuParticleSystem implements ParticleSystem {
       this.hue[i] = this.hue[last];
       this.alpha[i] = this.alpha[last];
       this.rainbowFlag[i] = this.rainbowFlag[last];
+      this.holo[i] = this.holo[last];
+      this.tintT[i] = this.tintT[last];
     }
   }
 
   clear(): void {
     this.count = 0;
+    this.tintedCount = 0;
+    this.holoCount = 0;
   }
 
   step(dt: number): void {
@@ -132,7 +190,6 @@ export class CpuParticleSystem implements ParticleSystem {
     if (n === 0) return;
 
     const { gravityEnabled, gravity, drag, hueBase, hueByPos, hueDrift, hueBySpeed, spin } = config;
-    // gravity is a vector now: straight down by default, or tilted by the device (Tilt mode)
     const g = gravityEnabled ? gravity : 0;
     const gxv = g * config.runtime.gravDirX;
     const gyv = g * config.runtime.gravDirY;
@@ -142,7 +199,10 @@ export class CpuParticleSystem implements ParticleSystem {
     const hueLo = this.hueLo;
     const hueSpan = this.hueHi - this.hueLo;
     const rainbow = this.rainbowFlag;
+    const holo = this.holo;
+    const tintT = this.tintT;
     const rainbowPhase = this.time * 0.25;
+    const holoPhase = this.time * 0.55; // faster shimmer for holographic distinction
     const points = this.forcePoints;
     const hasPoints = points.length > 0;
     const accel = this.accel;
@@ -156,9 +216,10 @@ export class CpuParticleSystem implements ParticleSystem {
     const hue = this.hue;
     const alpha = this.alpha;
 
-    // integrate + cosmetics
     perf.begin("integrate");
     let sumSpeed = 0;
+    let tinted = 0;
+    let holos = 0;
     for (let i = 0; i < n; i++) {
       let ax = gxv;
       let ay = gyv;
@@ -176,46 +237,51 @@ export class CpuParticleSystem implements ParticleSystem {
       px[i] += nvx * dt;
       py[i] += nvy * dt;
 
-      // hue: rainbow particles span the full spectrum; others map the spatial gradient
-      // into the unlocked colour band [hueLo, hueHi].
       const speed = Math.sqrt(nvx * nvx + nvy * nvy);
       sumSpeed += speed;
-      if (rainbow[i]) {
+
+      if (holo[i]) {
+        // holographic: distinct shimmer (faster phase, tighter spatial freq), max brightness
+        holos++;
+        let hr = holoPhase + (px[i] + py[i]) * 0.0042;
+        hr -= Math.floor(hr);
+        hue[i] = hr;
+        alpha[i] = 0.92 + Math.min(0.08, speed * 0.0005);
+      } else if (rainbow[i] || tintT[i] > 0) {
+        // rainbow buff OR temporary tint from rainbow blast
+        if (tintT[i] > 0) {
+          tintT[i] = Math.max(0, tintT[i] - dt);
+          tinted++;
+        }
         let hr = rainbowPhase + (px[i] + py[i]) * 0.0026;
         hr -= Math.floor(hr);
         hue[i] = hr;
+        alpha[i] = 0.55 + Math.min(0.55, speed * 0.0016);
       } else {
         let hv = hueOffset + (px[i] + py[i]) * hueByPos + speed * hueBySpeed;
-        hv -= Math.floor(hv); // wrap to 0..1
+        hv -= Math.floor(hv);
         hue[i] = hueLo + hv * hueSpan;
+        alpha[i] = 0.55 + Math.min(0.55, speed * 0.0016);
       }
+
       let a = angle[i] + dSpin;
       if (a > Math.PI * 2) a -= Math.PI * 2;
       angle[i] = a;
-      alpha[i] = 0.55 + Math.min(0.55, speed * 0.0016);
     }
     this.avgSpeed = sumSpeed / n;
+    this.tintedCount = tinted;
+    this.holoCount = holos;
     perf.end("integrate");
 
-    // walls
     perf.begin("walls");
     resolveWalls(
-      px,
-      py,
-      vx,
-      vy,
-      n,
-      this.w,
-      this.h,
-      config.restitution,
-      config.wallFriction,
-      config.wallKick,
-      this.events,
-      8
+      px, py, vx, vy, n,
+      this.w, this.h,
+      config.restitution, config.wallFriction, config.wallKick,
+      this.events, 8
     );
     perf.end("walls");
 
-    // soft separation (perf-guarded + adaptive frequency)
     const sep = config.separation;
     this.stepCounter++;
     const runSep = sep.enabled && n <= sep.maxCount && this.stepCounter % config.runtime.sepEveryN === 0;
@@ -225,18 +291,9 @@ export class CpuParticleSystem implements ParticleSystem {
       perf.end("grid");
       perf.begin("separation");
       resolveSeparation(
-        this.grid,
-        px,
-        py,
-        vx,
-        vy,
-        n,
-        sep.radius,
-        sep.correction,
-        sep.damping,
-        sep.maxNeighbors,
-        this.events, // micro pings share the event list (cap is total)
-        14,
+        this.grid, px, py, vx, vy, n,
+        sep.radius, sep.correction, sep.damping, sep.maxNeighbors,
+        this.events, 14,
         this.stepCounter & 511
       );
       perf.end("separation");

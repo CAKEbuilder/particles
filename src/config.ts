@@ -117,6 +117,20 @@ export const config = {
     minAppetite: 30, // floor so early tiny swarms still have a beatable target
   },
 
+  // ---- peaceful visitors (toy + Journey) ----
+  visitors: {
+    rainbowBlastEvery: [50, 90] as [number, number],  // seconds between rainbow blasts
+    shootingStarEvery: [70, 130] as [number, number], // seconds between shooting stars
+    rainbowBlastSpeed: 260,  // px/s across the field
+    shootingStarSpeed: 380,  // px/s toward the landing spot
+    tintDuration: 7,         // seconds a particle stays tinted after a rainbow blast
+    tintRadius: 55,          // radius around the blast trail that gets tinted
+    infectRadius: 48,        // radius of holographic spread per pulse
+    infectPerFrame: 2,       // max new holo particles per infection pulse
+    infectEvery: 0.55,       // seconds between infection pulses (wave spread)
+    journeyRainbowMult: 2.0, // points multiplier for tinted particles in Journey
+  },
+
   // ---- audio ----
   audio: {
     bpm: 84, // quantization tempo for note triggers
