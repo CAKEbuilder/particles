@@ -9,11 +9,11 @@ import type { CpuParticleSystem } from "../sim/CpuParticleSystem";
 type ToolFilter = Tool[] | null; // null = show all unlocked; array = show only these
 
 const TOOLS: { tool: Tool; label: string; unlockLevel: number }[] = [
-  { tool: "spawn",   label: "✦ Spawn",   unlockLevel: 1 },
-  { tool: "attract", label: "◉ Attract", unlockLevel: 1 },
-  { tool: "repel",   label: "◎ Repel",   unlockLevel: 2 },
-  { tool: "wind",    label: "≈ Wind",     unlockLevel: 4 },
-  { tool: "erase",   label: "⌫ Erase",   unlockLevel: 6 },
+  { tool: "spawn",   label: "Spawn",   unlockLevel: 1 },
+  { tool: "attract", label: "Attract", unlockLevel: 1 },
+  { tool: "repel",   label: "Repel",   unlockLevel: 2 },
+  { tool: "wind",    label: "Wind",    unlockLevel: 4 },
+  { tool: "erase",   label: "Erase",   unlockLevel: 6 },
 ];
 
 export interface HudOptions {
@@ -52,11 +52,11 @@ export class Hud {
 
     const actions = document.createElement("div");
     actions.className = "hud-group";
-    this.gravityBtn = this.button("↓ Gravity", () => this.toggleGravity());
-    this.tiltBtn = this.button("⟲ Tilt", () => this.toggleTilt());
-    this.pauseBtn = this.button("❚❚", () => this.togglePause());
-    const clearBtn = this.button("✕ Clear", () => this.system.clear());
-    const menuBtn = this.button("☰ Menu", () => this.opts.onMenu());
+    this.gravityBtn = this.button("Gravity", () => this.toggleGravity());
+    this.tiltBtn = this.button("Tilt", () => this.toggleTilt());
+    this.pauseBtn = this.button("Pause", () => this.togglePause());
+    const clearBtn = this.button("Clear", () => this.system.clear());
+    const menuBtn = this.button("Menu", () => this.opts.onMenu());
     actions.appendChild(this.gravityBtn);
     actions.appendChild(this.tiltBtn);
     actions.appendChild(this.pauseBtn);
@@ -104,11 +104,11 @@ export class Hud {
   private togglePause(): void {
     if (this.loop.isRunning) {
       this.loop.stop();
-      this.pauseBtn.textContent = "▶";
+      this.pauseBtn.textContent = "Resume";
       this.pauseBtn.classList.add("active");
     } else {
       this.loop.start();
-      this.pauseBtn.textContent = "❚❚";
+      this.pauseBtn.textContent = "Pause";
       this.pauseBtn.classList.remove("active");
     }
   }

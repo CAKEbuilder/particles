@@ -99,6 +99,11 @@ export class Playfield {
     }
   }
 
+  /** Require level/count thresholds before portals, targets, and maze can appear. */
+  setLevelGated(on: boolean): void {
+    this.levelGate = on;
+  }
+
   private clear(): void {
     this.portal?.el.remove();
     this.obstacle?.el.remove();

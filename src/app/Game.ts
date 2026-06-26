@@ -34,11 +34,11 @@ export type Mode = "title" | "toy" | "sandbox" | "game" | "collection" | "intro"
 
 // Tool labels for unlock toasts (excludes spawn/attract which are always available)
 const UNLOCK_TOASTS: { key: string; label: string }[] = [
-  { key: "repel",   label: "◎ Repel" },
-  { key: "wind",    label: "≈ Wind" },
-  { key: "erase",   label: "⌫ Erase" },
-  { key: "gravity", label: "↓ Gravity" },
-  { key: "tilt",    label: "⟲ Tilt" },
+  { key: "repel",   label: "Repel" },
+  { key: "wind",    label: "Wind" },
+  { key: "erase",   label: "Erase" },
+  { key: "gravity", label: "Gravity" },
+  { key: "tilt",    label: "Tilt" },
 ];
 
 export class Game {
@@ -339,6 +339,7 @@ export class Game {
         this.gameHud.setVisible(true);
         this.gameHud.update();
 
+        this.playfield.setLevelGated(true); // require level/count gates before portals/maze/targets appear
         this.gameHud.setReveal(3); // full UI — no staged reveal, players come from toy or title
         this.hud.updateUnlocks(this.save.data.level);
         break;

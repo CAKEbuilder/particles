@@ -12,8 +12,8 @@ export interface TierDef {
 }
 
 export const TIERS: Record<Tier, TierDef> = {
-  common: { id: "common", name: "Common", color: "#7fb0ff", weight: 100, holo: false },
-  uncommon: { id: "uncommon", name: "Uncommon", color: "#46e08a", weight: 55, holo: false },
+  common: { id: "common", name: "Common", color: "#7fb0ff", weight: 180, holo: false },
+  uncommon: { id: "uncommon", name: "Uncommon", color: "#46e08a", weight: 90, holo: false },
   rare: { id: "rare", name: "Rare", color: "#2ee6ff", weight: 26, holo: false },
   epic: { id: "epic", name: "Epic", color: "#b06bff", weight: 11, holo: false },
   holographic: { id: "holographic", name: "Holographic", color: "#ff5bd0", weight: 4, holo: true },

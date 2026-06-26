@@ -36,7 +36,8 @@ export class Alert {
 
     const icon = document.createElement("div");
     icon.className = "alert-icon";
-    icon.textContent = opts.known ? opts.glyph : "?";
+    // Unknown visitors show a friendly sparkle instead of a threatening "?"
+    icon.textContent = opts.known ? opts.glyph : "✦";
     if (!opts.known) icon.classList.add("alert-unknown");
 
     this.timer = document.createElement("div");
@@ -71,7 +72,7 @@ export class Alert {
   }
 
   setCountdown(seconds: number): void {
-    this.timer.textContent = seconds > 0 ? `${Math.ceil(seconds)}s` : "▲";
+    this.timer.textContent = seconds > 0 ? `${Math.ceil(seconds)}s` : "";
   }
 
   remove(): void {
