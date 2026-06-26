@@ -11,6 +11,8 @@
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 html,
@@ -37,6 +39,7 @@ body {
   height: 100%;
   display: block;
   touch-action: none; /* we handle all gestures ourselves */
+  -webkit-touch-callout: none; /* suppress iOS long-press callout menu over canvas */
   cursor: crosshair;
 }
 
