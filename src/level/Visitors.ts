@@ -19,6 +19,7 @@ interface ActiveVisitor {
   arrived: boolean;
   destX: number;
   destY: number;
+  rippleTimer: number; // for rainbow: countdown to next CSS ripple ring (s)
 }
 
 const rand = (a: number, b: number): number => a + Math.random() * (b - a);
@@ -33,9 +34,10 @@ export class Visitors {
     private readonly parent: HTMLElement,
     private readonly system: CpuParticleSystem
   ) {
-    // stagger so they don't both fire immediately on first entry
-    this.rainbowTimer = rand(12, 25);
-    this.starTimer = rand(20, 45);
+    // First appearances are deliberately late — these are rare delights, not tutorials.
+    // Minimum ~90s for rainbow, ~140s for star, so new players are settled before they appear.
+    this.rainbowTimer = rand(90, 160);
+    this.starTimer = rand(140, 220);
   }
 
   update(dt: number): void {
@@ -73,7 +75,15 @@ export class Visitors {
         vis.y += vis.dy * dt;
         vis.el.style.left = `${vis.x}px`;
         vis.el.style.top = `${vis.y}px`;
-        this.system.tintNear(vis.x, vis.y, v.tintRadius, v.tintDuration);
+        this.system.tintNear(vis.x, vis.y, v.tintRadius);
+
+        // spawn an expanding CSS ripple ring along the trail
+        vis.rippleTimer -= dt;
+        if (vis.rippleTimer <= 0) {
+          this.spawnRipple(vis.x, vis.y);
+          vis.rippleTimer = v.tintRippleEvery;
+        }
+
         if (vis.elapsed >= vis.life) {
           vis.el.remove();
           this.active.splice(k, 1);
@@ -115,6 +125,17 @@ export class Visitors {
     }
   }
 
+  /** Spawn a short-lived expanding ring at (x, y) along the rainbow trail. */
+  private spawnRipple(x: number, y: number): void {
+    const ring = document.createElement("div");
+    ring.className = "ripple-ring";
+    ring.style.left = `${x}px`;
+    ring.style.top = `${y}px`;
+    this.parent.appendChild(ring);
+    // auto-remove after the animation completes
+    ring.addEventListener("animationend", () => ring.remove(), { once: true });
+  }
+
   private spawnRainbow(w: number, h: number): void {
     const fromLeft = Math.random() < 0.5;
     const x = fromLeft ? -18 : w + 18;
@@ -132,6 +153,7 @@ export class Visitors {
       dx: fromLeft ? speed : -speed, dy: 0,
       speed, el, life, elapsed: 0,
       arrived: false, destX: x, destY: y,
+      rippleTimer: config.visitors.tintRippleEvery * 0.5, // first ring comes quickly
     });
   }
 
@@ -153,6 +175,7 @@ export class Visitors {
       dx: 0, dy: speed, // overridden on arrival
       speed, el, life, elapsed: 0,
       arrived: false, destX, destY,
+      rippleTimer: 0,
     });
   }
 

@@ -388,8 +388,8 @@ export class Game {
     this.taglineEl = el;
     window.setTimeout(() => {
       el.classList.add("mode-tagline--out");
-      window.setTimeout(() => { el.remove(); if (this.taglineEl === el) this.taglineEl = null; }, 700);
-    }, 1800);
+      window.setTimeout(() => { el.remove(); if (this.taglineEl === el) this.taglineEl = null; }, 800);
+    }, 3200);
   }
 
   private ambientBloom(w: number, h: number): void {

@@ -114,14 +114,18 @@ export class CpuParticleSystem implements ParticleSystem {
     return removed;
   }
 
-  /** Mark particles within radius as temporarily tinted for `seconds` (refreshes existing tint). */
-  tintNear(x: number, y: number, radius: number, seconds: number): void {
+  /** Softly tint particles near (x, y). tintT is 0..1 intensity; uses quadratic falloff
+   *  so there is no hard edge — particles near the center get full tint, edge particles get ~0. */
+  tintNear(x: number, y: number, radius: number): void {
     const r2 = radius * radius;
     for (let i = 0; i < this.count; i++) {
       const dx = this.px[i] - x;
       const dy = this.py[i] - y;
-      if (dx * dx + dy * dy <= r2) {
-        if (this.tintT[i] < seconds) this.tintT[i] = seconds;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < r2) {
+        const t = d2 / r2;                    // 0 = centre, 1 = edge
+        const strength = (1 - t) * (1 - t);   // quadratic: 1 at centre, 0 at edge, smooth
+        if (this.tintT[i] < strength) this.tintT[i] = strength;
       }
     }
   }
@@ -202,7 +206,8 @@ export class CpuParticleSystem implements ParticleSystem {
     const holo = this.holo;
     const tintT = this.tintT;
     const rainbowPhase = this.time * 0.25;
-    const holoPhase = this.time * 0.55; // faster shimmer for holographic distinction
+    const holoPhase = this.time * 0.55;
+    const tintDecay = config.visitors.tintDecayPerSec * dt;
     const points = this.forcePoints;
     const hasPoints = points.length > 0;
     const accel = this.accel;
@@ -248,15 +253,25 @@ export class CpuParticleSystem implements ParticleSystem {
         hue[i] = hr;
         alpha[i] = 0.92 + Math.min(0.08, speed * 0.0005);
       } else if (rainbow[i] || tintT[i] > 0) {
-        // rainbow buff OR temporary tint from rainbow blast
+        // rainbow buff or temporary tint from blast
+        let blend = 1.0; // rainbow flag = always full rainbow
         if (tintT[i] > 0) {
-          tintT[i] = Math.max(0, tintT[i] - dt);
+          tintT[i] = Math.max(0, tintT[i] - tintDecay);
+          blend = tintT[i]; // 0..1 — fades smoothly back to normal hue
           tinted++;
         }
         let hr = rainbowPhase + (px[i] + py[i]) * 0.0026;
         hr -= Math.floor(hr);
-        hue[i] = hr;
-        alpha[i] = 0.55 + Math.min(0.55, speed * 0.0016);
+        if (blend < 1) {
+          // blend rainbow toward normal hue as tint fades
+          let hv = hueOffset + (px[i] + py[i]) * hueByPos + speed * hueBySpeed;
+          hv -= Math.floor(hv);
+          const hn = hueLo + hv * hueSpan;
+          hue[i] = hn + blend * (hr - hn);
+        } else {
+          hue[i] = hr;
+        }
+        alpha[i] = 0.55 + Math.min(0.55, speed * 0.0016) + blend * 0.12;
       } else {
         let hv = hueOffset + (px[i] + py[i]) * hueByPos + speed * hueBySpeed;
         hv -= Math.floor(hv);

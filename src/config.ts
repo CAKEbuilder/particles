@@ -121,10 +121,11 @@ export const config = {
   visitors: {
     rainbowBlastEvery: [50, 90] as [number, number],  // seconds between rainbow blasts
     shootingStarEvery: [70, 130] as [number, number], // seconds between shooting stars
-    rainbowBlastSpeed: 260,  // px/s across the field
-    shootingStarSpeed: 380,  // px/s toward the landing spot
-    tintDuration: 7,         // seconds a particle stays tinted after a rainbow blast
-    tintRadius: 55,          // radius around the blast trail that gets tinted
+    rainbowBlastSpeed: 200,  // px/s — slower so the trail is continuous and smooth
+    shootingStarSpeed: 380,
+    tintRadius: 175,         // soft-falloff radius; tintNear uses quadratic falloff so no hard edge
+    tintDecayPerSec: 0.16,   // 0..1 per second; full-intensity particle fades over ~6s
+    tintRippleEvery: 0.45,   // seconds between expanding CSS ripple rings along the trail
     infectRadius: 48,        // radius of holographic spread per pulse
     infectPerFrame: 2,       // max new holo particles per infection pulse
     infectEvery: 0.55,       // seconds between infection pulses (wave spread)
