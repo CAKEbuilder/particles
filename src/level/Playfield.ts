@@ -1,10 +1,9 @@
-// Dynamic playfield: objects appear, change, and expire over time rather than being a
-// fixed layout. An obstacle relocates/retypes periodically; portals come and go; and
-// destructible "buff targets" spawn that you bombard with particles to earn a power-up.
+// Dynamic playfield: portals cycle on/off; destructible buff targets spawn periodically;
+// a compact thin-line maze with a buff target inside appears at higher levels.
 // Particles are simulated in WebGL; these objects are DOM overlays + sim-side interaction.
 
 import type { CpuParticleSystem } from "../sim/CpuParticleSystem";
-import { makeTriangle, makeWall, resolveShape, type Shape } from "./shapes";
+import { makeWall, resolveShape, type Shape } from "./shapes";
 
 interface Portal {
   ax: number;
@@ -26,7 +25,7 @@ interface Target {
   r: number;
   hp: number;
   hpMax: number;
-  life: number; // seconds until it leaves
+  life: number;
   el: HTMLDivElement;
   hpEl: HTMLDivElement;
   shapeEl: HTMLDivElement;
@@ -34,19 +33,16 @@ interface Target {
 
 const OBSTACLE_RESTITUTION = 0.7;
 
-// timing windows (seconds)
-const OBSTACLE_CHANGE = [20, 32] as const;
-const PORTAL_FIRST = 60;          // countdown starts only after level/count gate is met
+const PORTAL_FIRST = 60;
 const PORTAL_ON = [22, 30] as const;
 const PORTAL_OFF = [16, 28] as const;
-const TARGET_FIRST = 90;          // buff targets come later still
+const TARGET_FIRST = 90;
 const TARGET_EVERY = [28, 46] as const;
 const TARGET_LIFE = 16;
-const MAZE_FIRST = 120;           // maze corridors come after portals are established
+const MAZE_FIRST = 120;
 const MAZE_ON = [30, 45] as const;
 const MAZE_OFF = [20, 35] as const;
 
-// minimum thresholds before portals / buff targets can appear
 const PORTAL_MIN_LEVEL = 3;
 const PORTAL_MIN_COUNT = 300;
 const TARGET_MIN_LEVEL = 5;
@@ -58,21 +54,19 @@ const rand = (a: number, b: number): number => a + Math.random() * (b - a);
 
 export class Playfield {
   private portal: Portal | null = null;
-  private obstacle: Obstacle | null = null;
-  private walls: Obstacle[] = []; // current maze wall segments
+  private walls: Obstacle[] = [];
   private targets: Target[] = [];
   private enabled = false;
-  private tutorial = false; // tutorial mode: one static obstacle only — no portals, targets, or reshaping
-  private levelGate = false; // when true, portal/target timers only count down once level/count thresholds are met
+  private tutorial = false;
+  private levelGate = false;
 
-  private obstacleTimer = 0;
   private portalTimer = 0;
   private portalOn = false;
   private targetTimer = 0;
   private mazeTimer = 0;
   private mazeOn = false;
 
-  throughput = 0; // particles teleported since last read
+  throughput = 0;
 
   constructor(
     private readonly parent: HTMLElement,
@@ -87,41 +81,32 @@ export class Playfield {
     else this.clear();
   }
 
-  /** Tutorial mode shows only a single static obstacle; portals/targets/reshaping are held back.
-   *  Turning it off re-seeds the portal/target timers so they don't all fire at once. */
   setTutorial(on: boolean): void {
     this.tutorial = on;
     if (!on) {
-      this.levelGate = true; // gate portals/targets by level for the rest of this session
+      this.levelGate = true;
       this.portalTimer = PORTAL_FIRST;
       this.targetTimer = TARGET_FIRST;
-      this.obstacleTimer = rand(...OBSTACLE_CHANGE);
     }
   }
 
-  /** Require level/count thresholds before portals, targets, and maze can appear. */
   setLevelGated(on: boolean): void {
     this.levelGate = on;
   }
 
   private clear(): void {
     this.portal?.el.remove();
-    this.obstacle?.el.remove();
     for (const w of this.walls) w.el.remove();
     for (const t of this.targets) t.el.remove();
     this.portal = null;
-    this.obstacle = null;
     this.walls.length = 0;
     this.targets.length = 0;
     this.portalOn = false;
     this.mazeOn = false;
   }
 
-  /** Start state: one obstacle, no portal yet, target/portal scheduled for later. */
   private build(): void {
     this.clear();
-    this.relocateObstacle();
-    this.obstacleTimer = rand(...OBSTACLE_CHANGE);
     this.portalTimer = PORTAL_FIRST;
     this.targetTimer = TARGET_FIRST;
     this.mazeTimer = MAZE_FIRST;
@@ -129,25 +114,6 @@ export class Playfield {
 
   relayout(): void {
     if (this.enabled) this.build();
-  }
-
-  // ---- obstacle ----
-  private relocateObstacle(): void {
-    this.obstacle?.el.remove();
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    const x = rand(w * 0.2, w * 0.8);
-    const y = rand(h * 0.25, h * 0.7);
-    const r = rand(44, 64);
-    const circle = Math.random() < 0.5;
-    const el = document.createElement("div");
-    el.className = circle ? "obstacle obstacle-circle" : "obstacle obstacle-triangle";
-    el.style.left = `${x}px`;
-    el.style.top = `${y}px`;
-    el.style.setProperty("--r", `${r * 2}px`);
-    this.parent.appendChild(el);
-    const shape: Shape = circle ? { kind: "circle", x, y, r } : makeTriangle(x, y, r);
-    this.obstacle = { shape, el };
   }
 
   // ---- portals ----
@@ -162,8 +128,10 @@ export class Playfield {
     const el = document.createElement("div");
     el.className = "portal portal-spawn";
     el.innerHTML =
-      `<div class="portal-end portal-in" style="left:${ax}px;top:${ay}px"></div>` +
-      `<div class="portal-end portal-out" style="left:${bx}px;top:${by}px"></div>`;
+      `<div class="portal-end portal-in" style="left:${ax}px;top:${ay}px">` +
+        `<span class="portal-label">IN</span></div>` +
+      `<div class="portal-end portal-out" style="left:${bx}px;top:${by}px">` +
+        `<span class="portal-label">OUT</span></div>`;
     (el.querySelector(".portal-in") as HTMLDivElement).style.setProperty("--r", `${r * 2}px`);
     (el.querySelector(".portal-out") as HTMLDivElement).style.setProperty("--r", `${r * 2}px`);
     this.parent.appendChild(el);
@@ -171,31 +139,22 @@ export class Playfield {
   }
 
   // ---- maze corridors ----
-  /** Spawn a simple L-shaped or straight corridor from 2-3 wall segments plus a buff target at the open end. */
+  /** Compact U-shape maze: two vertical arms + one horizontal base, with buff target inside. */
   private spawnMaze(): void {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    // anchor in the mid-screen area
-    const cx = rand(w * 0.25, w * 0.75);
-    const cy = rand(h * 0.3, h * 0.65);
-    const thick = 12; // wall half-thickness (px)
-    const len = rand(80, 130); // wall half-length
+    const cx = rand(w * 0.28, w * 0.72);
+    const cy = rand(h * 0.28, h * 0.58);
+    const thick = 5;   // half-thickness of each wall (~10px visual)
+    const arm = 65;    // half-height of the vertical arms
+    const gap = 38;    // half-width of interior corridor
 
-    // pick orientation: horizontal corridor or vertical
-    const horiz = Math.random() < 0.5;
-    const wallDefs: Array<[number, number, number, number]> = horiz
-      ? [
-          // top wall
-          [cx, cy - 36, len, thick],
-          // bottom wall
-          [cx, cy + 36, len, thick],
-        ]
-      : [
-          // left wall
-          [cx - 36, cy, thick, len],
-          // right wall
-          [cx + 36, cy, thick, len],
-        ];
+    // U opening upward: left arm, right arm, bottom connector
+    const wallDefs: Array<[number, number, number, number]> = [
+      [cx - gap - thick, cy, thick, arm],           // left arm
+      [cx + gap + thick, cy, thick, arm],           // right arm
+      [cx, cy + arm, gap + thick * 2 + thick, thick], // bottom connector
+    ];
 
     for (const [wx, wy, hw, hh] of wallDefs) {
       const shape = makeWall(wx, wy, hw, hh);
@@ -209,10 +168,8 @@ export class Playfield {
       this.walls.push({ shape, el });
     }
 
-    // buff target at the open end of the corridor
-    const targetX = horiz ? cx + len + 28 : cx;
-    const targetY = horiz ? cy : cy + len + 28;
-    this.spawnTargetAt(targetX, targetY);
+    // buff target inside the U near the bottom
+    this.spawnTargetAt(cx, cy + arm - 28);
   }
 
   private clearMaze(): void {
@@ -230,11 +187,10 @@ export class Playfield {
   private spawnTargetAt(x: number, y: number): void {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    // clamp to visible area
     x = Math.max(60, Math.min(w - 60, x));
     y = Math.max(60, Math.min(h - 120, y));
-    const r = 38;
-    const hp = 480;
+    const r = 26;
+    const hp = 300;
     const el = document.createElement("div");
     el.className = "target";
     el.style.left = `${x}px`;
@@ -250,22 +206,12 @@ export class Playfield {
     this.targets.push({ x, y, r, hp, hpMax: hp, life: TARGET_LIFE, el, hpEl, shapeEl });
   }
 
-  /** Advance object lifecycles + apply interactions. Game mode only. */
   update(dt: number, level = 1, count = 0): void {
     if (!this.enabled) return;
     const w = window.innerWidth;
     const h = window.innerHeight;
 
-    // tutorial: just the single obstacle (no reshaping, portals, or targets)
     if (!this.tutorial) {
-      // obstacle relocation/retype
-      this.obstacleTimer -= dt;
-      if (this.obstacleTimer <= 0) {
-        this.relocateObstacle();
-        this.obstacleTimer = rand(...OBSTACLE_CHANGE);
-      }
-
-      // portals cycle on/off — only count down once the player has a real swarm
       const portalReady = !this.levelGate || level >= PORTAL_MIN_LEVEL || count >= PORTAL_MIN_COUNT;
       if (portalReady) {
         this.portalTimer -= dt;
@@ -283,7 +229,6 @@ export class Playfield {
         }
       }
 
-      // buff targets — gated even later
       const targetReady = !this.levelGate || level >= TARGET_MIN_LEVEL || count >= TARGET_MIN_COUNT;
       if (targetReady) {
         this.targetTimer -= dt;
@@ -293,7 +238,6 @@ export class Playfield {
         }
       }
 
-      // maze corridors — latest gate; spawn a corridor + buff target at the end
       const mazeReady = !this.levelGate || level >= MAZE_MIN_LEVEL || count >= MAZE_MIN_COUNT;
       if (mazeReady) {
         this.mazeTimer -= dt;
@@ -326,7 +270,6 @@ export class Playfield {
         const dx = px[i] - p.ax;
         const dy = py[i] - p.ay;
         if (dx * dx + dy * dy < r2) {
-          // emerge from the exit and whoosh outward so the transport reads clearly
           const a = Math.random() * Math.PI * 2;
           const rr = Math.random() * p.r * 0.5;
           px[i] = p.bx + Math.cos(a) * rr;
@@ -338,10 +281,6 @@ export class Playfield {
         }
       }
       p.el.classList.toggle("emitting", teleported > 0);
-    }
-
-    if (this.obstacle) {
-      resolveShape(this.obstacle.shape, px, py, vx, vy, count, OBSTACLE_RESTITUTION);
     }
 
     for (const wall of this.walls) {
@@ -356,7 +295,6 @@ export class Playfield {
     for (let t = this.targets.length - 1; t >= 0; t--) {
       const tg = this.targets[t];
       tg.life -= dt;
-      // count particles inside -> damage
       const r2 = tg.r * tg.r;
       let near = 0;
       for (let i = 0; i < count; i++) {
@@ -365,8 +303,8 @@ export class Playfield {
         if (dx * dx + dy * dy < r2) near++;
       }
       tg.hp -= near * dt;
-      const fillFrac = Math.min(1, Math.max(0, 1 - tg.hp / tg.hpMax)); // 0 = untouched, 1 = done
-      tg.hpEl.style.width = `${fillFrac * 100}%`; // bar fills left→right as target is fed
+      const fillFrac = Math.min(1, Math.max(0, 1 - tg.hp / tg.hpMax));
+      tg.hpEl.style.width = `${fillFrac * 100}%`;
       tg.shapeEl.style.setProperty("--fill", fillFrac.toFixed(3));
 
       if (tg.hp <= 0) {

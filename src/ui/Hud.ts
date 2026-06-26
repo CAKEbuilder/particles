@@ -159,6 +159,11 @@ export class Hud {
     }
   }
 
+  /** Reset active tool to Spawn (called on every mode entry so players start consistently). */
+  resetToSpawn(): void {
+    this.selectTool("spawn");
+  }
+
   /** Show every tool regardless of unlock level or tutorial filter (for Sandbox). */
   showAllTools(): void {
     this.toolFilter = null;

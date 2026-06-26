@@ -1,5 +1,5 @@
-// Game-mode HUD: swarm counter, points, level + XP bar, spawn-energy bar, and a
-// permanent-buffs shop. Reads live values from GameState.
+// Game-mode HUD: swarm counter, points, level + XP bar, heat indicator (hidden normally),
+// and a permanent-buffs shop.
 
 import { config } from "../config";
 import type { GameState } from "../game/GameState";
@@ -16,7 +16,9 @@ export class GameHud {
   private pointsEl: HTMLSpanElement;
   private levelEl: HTMLSpanElement;
   private xpFill: HTMLDivElement;
-  private energyFill: HTMLDivElement;
+  private heatRow: HTMLDivElement;
+  private heatFill: HTMLDivElement;
+  private heatLabel: HTMLSpanElement;
   private powerEl: HTMLDivElement;
   private shop: HTMLDivElement;
   private shopOpen = false;
@@ -32,7 +34,6 @@ export class GameHud {
   // Staged reveal refs
   private rowPoints: HTMLDivElement;
   private rowXp: HTMLDivElement;
-  private rowEnergy: HTMLDivElement;
 
   private lastDisplayedCount = -1;
   private revealStage: 0 | 1 | 2 | 3 = 3;
@@ -43,7 +44,6 @@ export class GameHud {
     private readonly powerups: PowerUps,
     private readonly onAscend: () => void
   ) {
-    // hero slot (top-centre): swarm counter always visible; pts/s shown at reveal ≥ 3
     this.hero = document.createElement("div");
     this.hero.className = "hero";
 
@@ -78,12 +78,13 @@ export class GameHud {
     this.el.appendChild(this.rowXp);
     this.xpFill = this.rowXp.querySelector(".gh-bar-fill") as HTMLDivElement;
 
-    // energy bar
-    this.rowEnergy = document.createElement("div");
-    this.rowEnergy.className = "gh-bar gh-bar-energy";
-    this.rowEnergy.innerHTML = `<span class="gh-bar-label">Energy</span><div class="gh-bar-track"><div class="gh-bar-fill"></div></div>`;
-    this.el.appendChild(this.rowEnergy);
-    this.energyFill = this.rowEnergy.querySelector(".gh-bar-fill") as HTMLDivElement;
+    // heat indicator — hidden during normal play, surfaces only when hot/cooling
+    this.heatRow = document.createElement("div");
+    this.heatRow.className = "gh-bar gh-bar-heat hidden-ui";
+    this.heatRow.innerHTML = `<span class="gh-bar-label gh-heat-label">Heat</span><div class="gh-bar-track"><div class="gh-bar-fill"></div></div>`;
+    this.el.appendChild(this.heatRow);
+    this.heatFill = this.heatRow.querySelector(".gh-bar-fill") as HTMLDivElement;
+    this.heatLabel = this.heatRow.querySelector(".gh-heat-label") as HTMLSpanElement;
 
     this.powerEl = document.createElement("div");
     this.powerEl.className = "gh-powerups";
@@ -112,7 +113,7 @@ export class GameHud {
     for (const id of Object.keys(config.game.buffs)) {
       const b = config.game.buffs[id];
       const row = document.createElement("div");
-      row.className = "gh-shop-row hidden-ui"; // hidden until unlockLevel met
+      row.className = "gh-shop-row hidden-ui";
       const nameWrap = document.createElement("div");
       nameWrap.className = "gh-shop-name-wrap";
       const name = document.createElement("span");
@@ -196,7 +197,6 @@ export class GameHud {
     const level = this.state.level;
     for (const [id, row] of this.buffRows) {
       const unlockLevel = config.game.buffs[id].unlockLevel;
-      // hide rows the player hasn't unlocked yet
       row.row.classList.toggle("hidden-ui", level < unlockLevel);
       if (level < unlockLevel) continue;
 
@@ -227,32 +227,23 @@ export class GameHud {
   }
 
   /**
-   * Staged reveal for tutorial:
-   *   0 — counter only (game-hud panel hidden, pts/s hidden)
-   *   1 — panel shows with level + XP bar; energy + points still hidden
-   *   2 — add energy bar + points
-   *   3 — full (pts/s subline visible)
+   * Staged reveal:
+   *   0 — counter only
+   *   1 — panel + XP bar
+   *   2 — add points row
+   *   3 — full (pts/s visible)
    */
   setReveal(stage: 0 | 1 | 2 | 3): void {
     this.revealStage = stage;
-    // stage 0: whole panel hidden; counter visible via hero block
     this.el.classList.toggle("hidden-ui", stage === 0);
-    // pts/s only at full reveal
     this.heroPps.classList.toggle("hidden-ui", stage < 3);
-    // points row + energy: hidden until stage 2
     this.rowPoints.classList.toggle("hidden-ui", stage < 2);
-    this.rowEnergy.classList.toggle("hidden-ui", stage < 2);
-    // xp bar: hidden until stage 1
     this.rowXp.classList.toggle("hidden-ui", stage < 1);
-    // active power-up timers: hidden until stage 2 (don't confuse with buff UI before it's explained)
     this.powerEl.classList.toggle("hidden-ui", stage < 2);
-    // shop button gated by level separately (updateunlocks handles it)
   }
 
-  /** Trigger a count-pop animation on the swarm counter. */
   private popCount(): void {
     this.swarmCount.classList.remove("count-pop");
-    // force reflow so the class removal takes effect before re-adding
     void this.swarmCount.offsetWidth;
     this.swarmCount.classList.add("count-pop");
   }
@@ -262,7 +253,6 @@ export class GameHud {
     const displayCount = formatCount(liveCount) + " / " + formatCount(cap);
     if (this.swarmCount.textContent !== displayCount) {
       this.swarmCount.textContent = displayCount;
-      // pop on any change; more dramatic the larger the jump
       if (liveCount !== this.lastDisplayedCount) this.popCount();
       this.lastDisplayedCount = liveCount;
     }
@@ -272,21 +262,29 @@ export class GameHud {
     this.pointsEl.textContent = Math.floor(this.state.points).toLocaleString();
     this.levelEl.textContent = String(this.state.level);
     this.xpFill.style.width = `${(this.state.levelProgress * 100).toFixed(1)}%`;
-    this.energyFill.style.width = `${((this.state.energy / this.state.energyMax) * 100).toFixed(1)}%`;
-    this.rowEnergy.classList.toggle("locked", this.state.locked);
+
+    // heat indicator: hide at low heat, show when noticeable (> 30% of cap)
+    const heat = this.state.heat;
+    const cap2 = this.state.coolantCap;
+    const heatFrac = heat / cap2;
+    const showHeat = heatFrac > 0.3 || this.state.cooling;
+    this.heatRow.classList.toggle("hidden-ui", !showHeat);
+    if (showHeat) {
+      this.heatFill.style.width = `${(heatFrac * 100).toFixed(1)}%`;
+      this.heatRow.classList.toggle("cooling", this.state.cooling);
+      this.heatLabel.textContent = this.state.cooling ? "Cooling" : "Heat";
+    }
 
     const ups = this.powerups.list();
     this.powerEl.innerHTML = ups
       .map((u) => `<span class="gh-pu">${u.label} <b>${Math.ceil(u.remaining)}s</b></span>`)
       .join("");
 
-    // show the Buffs button only after reaching level 2 AND at full reveal
     this.shopBtn.classList.toggle("hidden-ui", this.state.level < 2 || this.revealStage < 3);
     this.shopBtn.classList.toggle("has-deal", this.anyAffordable());
     if (this.shopOpen) this.refreshShop();
   }
 
-  /** True if any unlocked buff is purchasable now, or ascension is available — drives the ★ badge. */
   private anyAffordable(): boolean {
     if (this.state.canAscend()) return true;
     for (const [id] of this.buffRows) {

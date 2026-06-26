@@ -183,7 +183,7 @@ export class Game {
         this.powerups.grantRandom();
         this.gameHud.update();
       }
-      this.notify(`Level ${level}`, "Capacity & energy up", "level");
+      this.notify(`Level ${level}`, "Capacity up", "level");
       Haptics.level();
       this.checkAch();
       // announce newly unlocked tools
@@ -297,8 +297,7 @@ export class Game {
         break;
 
       case "toy":
-        // Calm, economy-free particle toy. No energy gate, no specials, no obstacles,
-        // no score/level HUD. First contact: satisfying to touch, nothing to fail at.
+        // Calm, economy-free particle toy. No gate, no specials, no obstacles.
         config.gravityEnabled = false;
         this.input.gate = null;
         this.system.softCap = this.device.capacity;
@@ -306,7 +305,9 @@ export class Game {
         this.input.streamRate = config.spawn.streamPerSec;
         this.hud.setVisible(true);
         this.hud.showAllTools();
+        this.hud.resetToSpawn();
         this.hud.setStatsVisible(false);
+        this.showTagline("No point. No goal. Just enjoy.");
         // Mark firstPlayDone so Journey mode doesn't run the old text tutorial
         if (!this.save.data.firstPlayDone) {
           this.save.data.firstPlayDone = true;
@@ -323,25 +324,30 @@ export class Game {
         this.input.streamRate = config.spawn.streamPerSec;
         this.ambientBloom(w, h);
         this.hud.setVisible(true);
-        this.hud.showAllTools(); // sandbox has no tool restrictions
+        this.hud.showAllTools();
+        this.hud.resetToSpawn();
+        this.showTagline("Everything unlocked. Play freely.");
         break;
 
       case "game": {
         config.gravityEnabled = false;
-        this.powerups.clear(); // start a run weak
+        this.powerups.clear();
         this.portalAccum = 0;
-        const [lo, hi] = this.state.spectrumBand(); // colours gated by unlocks
+        this.state.heat = 0;
+        this.state.cooling = false;
+        const [lo, hi] = this.state.spectrumBand();
         this.system.hueLo = lo;
         this.system.hueHi = hi;
-        this.state.resetEnergy();
         this.input.gate = (req) => this.state.tryConsumeSpawn(req, this.system.count);
         this.hud.setVisible(true);
+        this.hud.resetToSpawn();
         this.gameHud.setVisible(true);
         this.gameHud.update();
 
-        this.playfield.setLevelGated(true); // require level/count gates before portals/maze/targets appear
-        this.gameHud.setReveal(3); // full UI — no staged reveal, players come from toy or title
+        this.playfield.setLevelGated(true);
+        this.gameHud.setReveal(3);
         this.hud.updateUnlocks(this.save.data.level);
+        this.showTagline("Grow your swarm. Find your rhythm.");
         break;
       }
 
@@ -366,6 +372,22 @@ export class Game {
     }
   }
 
+  private taglineEl: HTMLDivElement | null = null;
+
+  /** Brief centered tagline that fades in then out on mode entry. */
+  private showTagline(text: string): void {
+    this.taglineEl?.remove();
+    const el = document.createElement("div");
+    el.className = "mode-tagline";
+    el.textContent = text;
+    document.getElementById("ui")?.appendChild(el);
+    this.taglineEl = el;
+    window.setTimeout(() => {
+      el.classList.add("mode-tagline--out");
+      window.setTimeout(() => { el.remove(); if (this.taglineEl === el) this.taglineEl = null; }, 700);
+    }, 1800);
+  }
+
   private ambientBloom(w: number, h: number): void {
     this.system.spawnBurst(w / 2, h / 2, {
       count: Math.min(800, Math.floor(this.device.capacity * 0.05)),
@@ -378,7 +400,6 @@ export class Game {
     if (this.paused) return; // frozen: keep the field intact, resume exactly where we left off
 
     // Continuous particle size: big solo, shrinks smoothly as count grows, tiny in thousands.
-    // Runs in game + sandbox + intro so the curve is consistent across all playable modes.
     if (this.mode === "game" || this.mode === "toy" || this.mode === "sandbox" || this.mode === "intro") {
       const n = this.system.count;
       const sc = config.spawn.sizeByCount;
@@ -391,8 +412,17 @@ export class Game {
       // Must be set before input.update so tap handlers on this frame see the right values
       this.system.softCap = this.state.maxCapacity;
       this.input.burstSize = this.state.burstSize;
-      this.input.streamRate = this.state.burstSize; // holding spawn = same rate as burst (1/sec until buff unlocked)
+      this.input.streamRate = config.spawn.streamPerSec; // full stream; heat limits sustained spam
       this.input.attractMult = this.state.attractMult;
+    }
+
+    // Toy/sandbox/intro: gentle count-based ramp so large particles are appreciable at low counts
+    if (this.mode === "toy" || this.mode === "sandbox" || this.mode === "intro") {
+      const n = this.system.count;
+      const r = config.spawn.ramp;
+      const scale = r.min + (1 - r.min) * Math.min(1, n / r.k);
+      this.input.burstSize = Math.max(1, Math.round(config.spawn.burst * scale));
+      this.input.streamRate = config.spawn.streamPerSec * scale;
     }
 
     this.input.update(dt);

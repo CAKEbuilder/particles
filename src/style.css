@@ -315,9 +315,9 @@ body {
 }
 .gh-bar-fill { height: 100%; width: 0%; border-radius: 5px; transition: width 0.18s linear; }
 .gh-bar-xp .gh-bar-fill { background: linear-gradient(90deg, #b06bff, #ff5bd0); }
-.gh-bar-energy .gh-bar-fill { background: linear-gradient(90deg, #2ee6ff, #3bff9e); }
-.gh-bar-energy.locked .gh-bar-fill { background: linear-gradient(90deg, #ff5b6b, #ffa13b); }
-.gh-bar-energy.locked .gh-bar-label { color: #ff8a8a; }
+.gh-bar-heat .gh-bar-fill { background: linear-gradient(90deg, #ffb13b, #ff5b6b); }
+.gh-bar-heat.cooling .gh-bar-fill { background: linear-gradient(90deg, #ff5b6b, #ff3b6b); }
+.gh-bar-heat.cooling .gh-heat-label { color: #ff8a8a; }
 .gh-rate { color: var(--text-dim); font-size: 11px; font-weight: 600; }
 .gh-cap { color: var(--text-dim); }
 .gh-cap-val { color: var(--text); font-weight: 600; }
@@ -673,6 +673,19 @@ body {
   from { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
   to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
+/* directional label inside each portal ring */
+.portal-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--pc);
+  opacity: 0.7;
+  pointer-events: none;
+}
 
 /* ---- buff target (bombard with particles to earn a power-up) ---- */
 .target { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 3; }
@@ -786,18 +799,19 @@ body {
   background: linear-gradient(160deg, rgba(120, 180, 255, 0.18), rgba(176, 107, 255, 0.1));
   filter: drop-shadow(0 0 14px rgba(120, 180, 255, 0.35));
 }
-/* wall obstacle — a glowing corridor segment; width/height set directly via style */
+/* wall obstacle — crisp neon line, no fill; thin glow for depth */
 .obstacle-wall {
   position: fixed;
   transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 2;
-  border-radius: 6px;
-  background: linear-gradient(135deg, rgba(100, 160, 255, 0.18), rgba(80, 100, 200, 0.12));
-  border: 1.5px solid rgba(120, 180, 255, 0.45);
+  border-radius: 3px;
+  background: transparent;
+  border: 2px solid var(--accent);
   box-shadow:
-    0 0 14px rgba(100, 160, 255, 0.3),
-    inset 0 0 10px rgba(80, 130, 255, 0.15);
+    0 0 6px rgba(46, 230, 255, 0.7),
+    0 0 18px rgba(46, 230, 255, 0.25),
+    inset 0 0 4px rgba(46, 230, 255, 0.15);
 }
 
 /* ---- power-up chips (in game HUD) ---- */
@@ -888,6 +902,35 @@ body {
   50%       { opacity: 1;   transform: scale(1.2); }
 }
 
+/* ---- mode-entry tagline (brief centered fade-in/out) ---- */
+.mode-tagline {
+  position: fixed;
+  left: 50%;
+  top: 38%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 7;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+  text-align: center;
+  white-space: nowrap;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.9);
+  animation: tagline-in 0.6s ease forwards;
+}
+.mode-tagline--out {
+  animation: tagline-out 0.7s ease forwards;
+}
+@keyframes tagline-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes tagline-out {
+  from { opacity: 1; transform: translateX(-50%) translateY(0); }
+  to   { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+}
+
 /* ---- toasts ---- */
 .toasts {
   /* bottom-center, above the toolbar; newest sits just above it, older rise */
@@ -973,26 +1016,66 @@ body {
   background: rgba(5, 6, 12, 0.97);
   padding: 16px;
 }
-.prog-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  margin-bottom: 20px;
-}
-.prog-stat {
+.prog-body { display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px; }
+
+/* identity header: level / ascensions / lifetime pts */
+.prog-identity {
+  display: flex;
+  gap: 0;
   border: 1px solid var(--panel-border);
   border-radius: 14px;
-  padding: 16px;
-  text-align: center;
   background: var(--panel);
+  overflow: hidden;
 }
-.prog-stat-val {
-  font-size: 26px;
+.prog-id-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 8px;
+  border-right: 1px solid var(--panel-border);
+}
+.prog-id-item:last-child { border-right: none; }
+.prog-id-val {
+  font-size: 22px;
   font-weight: 800;
   color: var(--accent);
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
-.prog-stat-label { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+.prog-id-key { font-size: 11px; color: var(--text-dim); margin-top: 5px; text-align: center; }
+
+/* completion progress bars */
+.prog-bar-row { display: flex; flex-direction: column; gap: 6px; }
+.prog-bar-header { display: flex; justify-content: space-between; }
+.prog-bar-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.prog-bar-frac { font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.prog-bar-track {
+  height: 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.prog-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.4s ease;
+  box-shadow: 0 0 8px rgba(46, 230, 255, 0.3);
+}
+
+/* buff tally */
+.prog-buff-tally {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.prog-buff-label { font-size: 13px; color: var(--text-dim); }
+.prog-buff-val { font-size: 16px; font-weight: 700; color: var(--accent-2); font-variant-numeric: tabular-nums; }
+
 .prog-settings { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
 .prog-toggle.on { border-color: rgba(46, 230, 255, 0.5); color: var(--accent); }
 .prog-reset { border-color: rgba(255, 91, 107, 0.5); color: #ff8a96; }

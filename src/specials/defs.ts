@@ -54,7 +54,7 @@ export const DEFS: SpecialDef[] = [
     glyph: "◎",
     behavior: "blast",
     effects: [{ kind: "vortex", level: 2 }],
-    lingerSec: 12,
+    lingerSec: 22,
     appetiteFrac: 0.8, // 80% of current capacity
     desc: ["Spins the swarm into a hypnotic whirl.", "Feed it particles to unlock."],
   },
@@ -68,7 +68,7 @@ export const DEFS: SpecialDef[] = [
       { kind: "attract", level: 2 },
       { kind: "vortex", level: 2 },
     ],
-    lingerSec: 13,
+    lingerSec: 24,
     appetiteFrac: 1.3, // 130% of current capacity — takes a couple refill cycles
     desc: ["Gathers and swirls — a living kaleidoscope.", "Feed it particles to unlock."],
   },
@@ -82,7 +82,7 @@ export const DEFS: SpecialDef[] = [
       { kind: "attract", level: 3 },
       { kind: "destroy", level: 2 },
     ],
-    lingerSec: 15,
+    lingerSec: 26,
     appetiteFrac: 2.0, // 200% — needs sustained feeding effort
     desc: ["Pulls particles in and devours them.", "Let it consume enough to unlock."],
   },
@@ -93,7 +93,7 @@ export const DEFS: SpecialDef[] = [
     glyph: "⬤",
     behavior: "blast",
     effects: [{ kind: "attract", level: 4 }],
-    lingerSec: 20,
+    lingerSec: 28,
     appetiteFrac: 0.8,
     desc: [
       "A gravitational hazard that devours nearby particles.",
@@ -111,7 +111,7 @@ export const DEFS: SpecialDef[] = [
       { kind: "repel", level: 3 },
       { kind: "destroy", level: 1 },
     ],
-    lingerSec: 18,
+    lingerSec: 30,
     appetiteFrac: 3.0, // 300% — the apex challenge
     desc: [
       "An anti-gravity black hole.",

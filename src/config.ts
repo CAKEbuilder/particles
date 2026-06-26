@@ -32,13 +32,14 @@ export const config = {
 
   // ---- spawning ----
   spawn: {
-    burst: 90, // particles per tap in sandbox/title (energy gates game mode separately)
+    burst: 90, // particles per tap in sandbox/title
     streamPerSec: 900, // particles/s while holding the spawn tool
     speed: 70, // initial outward speed (px/s)
     speedJitter: 60,
     size: 3.4,
     sizeJitter: 1.6,
     sizeByCount: { max: 12, min: 1.5, k: 40 }, // continuous size curve: big solo, tiny in thousands
+    ramp: { min: 0.04, k: 120 }, // toy/sandbox count-ramp: 4% burst at 0 particles, 100% at k
   },
 
   // ---- pointer forces ----
@@ -83,13 +84,10 @@ export const config = {
     pointRatePerParticle: 0.18, // base points/sec per live particle at rest (intentionally low — movement is the real earner)
     movementBonus: 3.0, // up to +300% points when fully stirred (~4× idle); active play clearly wins
     movementRefSpeed: 220, // avg particle speed (px/s) for full bonus; reachable with wind/attract so stirring registers
-    energy: {
-      base: 8.0, // spawn-energy pool max at level 1 (~13 particles); generous so hold-to-spawn feels good immediately
-      perLevel: 5.0, // grows meaningfully each level
-      regenBase: 1.5, // energy/sec at level 1; fast enough to respawn frequently
-      regenPerLevel: 1.2, // regen roughly doubles by level ~20
-      costPerParticle: 0.6, // energy spent per spawned particle
-      lockClearFraction: 0.3, // once depleted, must refill to this fraction before spawning again
+    heat: {
+      heatPerParticle: 0.005,  // heat added per spawned particle (0..1 scale)
+      coolPerSec: 0.5,          // heat dissipates at this rate per second
+      resetThreshold: 0.25,     // cooling clears once heat drops to this (gives ~1.5s cool window)
     },
     burstBase: 1,      // particles per tap at level 1 in game mode
     burstPerLevel: 0,  // burst only grows via the burst buff, not automatically with level
@@ -97,14 +95,12 @@ export const config = {
     xpGrowth: 1.5, // each level costs 50% more than the last (steep, so buffs pace out)
     ascendLevel: 15, // level required to ascend (prestige)
     ascendBonus: 0.25, // permanent point multiplier gained per ascension
-    // permanent buffs ordered by when they unlock (shop shows in this key order)
+    // permanent buffs — four clear upgrades unlocked progressively
     buffs: {
-      burst:        { cost: 120, growth: 1.7, per: 2,    max: 10, label: "Burst size",     desc: "More particles per tap + hold",      unlockLevel: 2 },
-      energyMax:    { cost: 120, growth: 1.7, per: 60,   max: 10, label: "Energy max",     desc: "Larger spawn energy pool",           unlockLevel: 3 },
-      energyRegen:  { cost: 120, growth: 1.7, per: 10,   max: 10, label: "Energy regen",   desc: "Refills your energy faster",         unlockLevel: 4 },
-      capacity:     { cost: 150, growth: 1.6, per: 25,   max: 20, label: "Capacity",       desc: "More particles on screen",           unlockLevel: 5 },
-      pointMult:    { cost: 200, growth: 1.8, per: 0.15, max: 8,  label: "Score Boost",    desc: "Earn more points per particle",      unlockLevel: 8 },
-      attractForce: { cost: 160, growth: 1.7, per: 0.25, max: 8,  label: "Attract power",  desc: "Stronger pull for finer control",    unlockLevel: 11 },
+      burst:    { cost: 120, growth: 1.7, per: 2,    max: 10, label: "Burst",       desc: "More particles per tap + hold",   unlockLevel: 2 },
+      capacity: { cost: 150, growth: 1.6, per: 25,   max: 20, label: "Capacity",    desc: "More particles on screen",        unlockLevel: 3 },
+      pointMult:{ cost: 200, growth: 1.8, per: 0.15, max: 8,  label: "Score Boost", desc: "Earn more points per particle",   unlockLevel: 4 },
+      coolant:  { cost: 140, growth: 1.6, per: 0.25, max: 8,  label: "Coolant",     desc: "Spawn more before overheating",   unlockLevel: 5 },
     } as Record<string, { cost: number; growth: number; per: number; max: number; label: string; desc: string; unlockLevel: number }>,
   },
 
