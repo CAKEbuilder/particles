@@ -195,7 +195,7 @@ export class CpuParticleSystem implements ParticleSystem {
     const n = this.count;
     if (n === 0) return;
 
-    const { gravityEnabled, gravity, drag, hueBase, hueByPos, hueDrift, hueBySpeed, spin } = config;
+    const { gravityEnabled, gravity, drag, hueBase, hueByPos, hueDrift, hueBySpeed, hueGradSpeed, spin } = config;
     const g = gravityEnabled ? gravity : 0;
     const gxv = g * config.runtime.gravDirX;
     const gyv = g * config.runtime.gravDirY;
@@ -209,6 +209,10 @@ export class CpuParticleSystem implements ParticleSystem {
     const tintT = this.tintT;
     const rainbowPhase = this.time * 0.25;
     const holoPhase = this.time * 0.55;
+    // slowly rotating gradient direction — eliminates the fixed diagonal colour seam
+    const gradAngle = this.time * hueGradSpeed;
+    const gradX = Math.cos(gradAngle);
+    const gradY = Math.sin(gradAngle);
     const tintDecay = config.visitors.tintDecayPerSec * dt;
     const points = this.forcePoints;
     const hasPoints = points.length > 0;
@@ -247,17 +251,18 @@ export class CpuParticleSystem implements ParticleSystem {
       const speed = Math.sqrt(nvx * nvx + nvy * nvy);
       sumSpeed += speed;
 
+      const gp = gradX * px[i] + gradY * py[i]; // rotating spatial gradient value
       if (holo[i]) {
         // holographic: distinct shimmer (faster phase, tighter spatial freq), max brightness
         holos++;
-        let hr = holoPhase + (px[i] + py[i]) * 0.0042;
+        let hr = holoPhase + gp * 0.0042;
         hr -= Math.floor(hr);
         hue[i] = hr;
         alpha[i] = 0.92 + Math.min(0.08, speed * 0.0005);
       } else if (rainbow[i]) {
         // permanent rainbow buff — always full rainbow, never overridden by tint
         if (tintT[i] > 0) tintT[i] = 0; // clear any stale tint on rainbow particles
-        let hr = rainbowPhase + (px[i] + py[i]) * 0.0026;
+        let hr = rainbowPhase + gp * 0.0026;
         hr -= Math.floor(hr);
         hue[i] = hr;
         alpha[i] = 0.55 + Math.min(0.55, speed * 0.0016);
@@ -266,16 +271,16 @@ export class CpuParticleSystem implements ParticleSystem {
         tintT[i] = Math.max(0, tintT[i] - tintDecay);
         const blend = tintT[i]; // 0..1, fades smoothly back to normal
         tinted++;
-        let hr = rainbowPhase + (px[i] + py[i]) * 0.0026;
+        let hr = rainbowPhase + gp * 0.0026;
         hr -= Math.floor(hr);
         // blend rainbow hue toward normal as tint fades
-        let hv = hueOffset + (px[i] + py[i]) * hueByPos + speed * hueBySpeed;
+        let hv = hueOffset + gp * hueByPos + speed * hueBySpeed;
         hv -= Math.floor(hv);
         const hn = hueLo + hv * hueSpan;
         hue[i] = hn + blend * (hr - hn);
         alpha[i] = 0.55 + Math.min(0.55, speed * 0.0016) + blend * 0.08;
       } else {
-        let hv = hueOffset + (px[i] + py[i]) * hueByPos + speed * hueBySpeed;
+        let hv = hueOffset + gp * hueByPos + speed * hueBySpeed;
         hv -= Math.floor(hv);
         hue[i] = hueLo + hv * hueSpan;
         alpha[i] = 0.55 + Math.min(0.55, speed * 0.0016);

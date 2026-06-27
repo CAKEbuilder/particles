@@ -1202,16 +1202,30 @@ body {
   z-index: 5;
 }
 
-.editor-toolbar .hud-btn {
+.editor-toolbar-group {
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 12px;
+  background: rgba(14, 18, 30, 0.75);
+  border: 1px solid rgba(120, 180, 255, 0.18);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   pointer-events: auto;
+}
+
+.editor-toolbar .hud-btn {
   font-size: 12px;
   padding: 7px 10px;
   min-width: 40px;
-  min-height: 36px;
-  background: rgba(14, 18, 30, 0.75);
-  border-color: rgba(120, 180, 255, 0.22);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  min-height: 34px;
+  background: transparent;
+  border-color: transparent;
+}
+
+.editor-toolbar .hud-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 .editor-item {

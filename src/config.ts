@@ -57,9 +57,10 @@ export const config = {
   background: [0.015, 0.02, 0.045] as [number, number, number],
   // hue is spatially coherent (a glob shares a colour instead of averaging to white):
   hueBase: 0.0, // base offset into the aurora ramp (0..1)
-  hueByPos: 0.0009, // hue gradient across space (per px) -> smooth colour fields
-  hueDrift: 0.03, // cycles/sec the whole field slowly drifts through the ramp
-  hueBySpeed: 0.0006, // small extra shift by speed for liveliness
+  hueByPos: 0.0006, // hue gradient magnitude across space (per px)
+  hueDrift: 0.04, // cycles/sec the whole field slowly drifts through the ramp
+  hueBySpeed: 0.0010, // speed-to-hue shift (more = faster particles are more distinctly coloured)
+  hueGradSpeed: 0.045, // rad/sec the gradient direction slowly rotates (eliminates fixed diagonal seam)
   // colour-spectrum unlocks widen the hue band the gradient maps into (start ~1 colour)
   spectrumMax: 6, // number of widen steps (level 1 = single hue, max = full aurora)
   spectrumUnlockEvery: 3, // a spectrum step unlocks every N player levels
