@@ -1223,6 +1223,13 @@ body {
   border-color: transparent;
 }
 
+.editor-toolbar .hud-btn.active {
+  color: #061018;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  border-color: transparent;
+  box-shadow: 0 0 14px rgba(46, 230, 255, 0.35);
+}
+
 .editor-toolbar .hud-btn:disabled {
   opacity: 0.3;
   cursor: default;
@@ -1251,6 +1258,108 @@ body {
   background: rgba(176, 107, 255, 0.18);
   border-color: rgba(176, 107, 255, 0.55);
   box-shadow: 0 0 8px rgba(176, 107, 255, 0.2);
+}
+
+/* ---- editor effects ---- */
+.editor-effect {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  pointer-events: none;
+}
+
+.editor-blackhole {
+  background: radial-gradient(circle, rgba(0,0,0,0.92) 30%, rgba(180,0,255,0.25) 70%, transparent 100%);
+  border: 1.5px solid rgba(180, 0, 255, 0.6);
+  border-radius: 50%;
+  box-shadow: 0 0 18px rgba(180, 0, 255, 0.5), inset 0 0 12px rgba(0,0,0,0.9);
+  animation: bh-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes bh-pulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(180,0,255,0.4), inset 0 0 10px rgba(0,0,0,0.9); }
+  50%       { box-shadow: 0 0 30px rgba(180,0,255,0.75), inset 0 0 18px rgba(0,0,0,0.95); }
+}
+
+.editor-gravityfield {
+  background: radial-gradient(circle, rgba(120, 80, 255, 0.15) 30%, transparent 80%);
+  border: 1.5px dashed rgba(140, 90, 255, 0.55);
+  border-radius: 4px;
+  box-shadow: 0 0 12px rgba(120, 80, 255, 0.2);
+  animation: mass-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes mass-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(120,80,255,0.15); }
+  50%       { box-shadow: 0 0 22px rgba(120,80,255,0.4); }
+}
+
+.editor-effect-glyph {
+  font-size: 22px;
+  opacity: 0.75;
+  pointer-events: none;
+  user-select: none;
+}
+
+.editor-gravityfield .editor-effect-glyph {
+  color: rgba(160, 110, 255, 0.9);
+  text-shadow: 0 0 12px rgba(120, 80, 255, 0.7);
+  animation: mass-spin 4s linear infinite;
+}
+
+@keyframes mass-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.editor-condenser {
+  background: radial-gradient(circle, rgba(255,180,50,0.12) 40%, transparent 75%);
+  border: 1.5px solid rgba(255,180,50,0.55);
+  border-radius: 50%;
+  box-shadow: 0 0 12px rgba(255,180,50,0.3);
+  animation: condenser-ring 1.5s ease-in-out infinite;
+}
+
+.editor-condenser .editor-effect-glyph {
+  color: rgba(255, 200, 80, 0.9);
+  text-shadow: 0 0 12px rgba(255, 180, 50, 0.7);
+}
+
+@keyframes condenser-ring {
+  0%, 100% { box-shadow: 0 0 8px rgba(255,180,50,0.25); }
+  50%       { box-shadow: 0 0 22px rgba(255,180,50,0.6); }
+}
+
+/* funnel container is full-canvas positioned */
+.editor-effect-funnel {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.funnel-in {
+  background: radial-gradient(circle, rgba(46,255,140,0.22) 40%, transparent 75%);
+  border: 2px solid rgba(46, 255, 140, 0.65);
+  box-shadow: 0 0 14px rgba(46,255,140,0.35);
+  animation: funnel-in-pulse 1s ease-in-out infinite;
+}
+
+.funnel-out {
+  background: radial-gradient(circle, rgba(46,180,255,0.22) 40%, transparent 75%);
+  border: 2px solid rgba(46, 180, 255, 0.65);
+  box-shadow: 0 0 14px rgba(46,180,255,0.35);
+  animation: funnel-out-pulse 1s ease-in-out infinite 0.5s;
+}
+
+@keyframes funnel-in-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(46,255,140,0.25); }
+  50%       { box-shadow: 0 0 22px rgba(46,255,140,0.6); }
+}
+
+@keyframes funnel-out-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(46,180,255,0.25); }
+  50%       { box-shadow: 0 0 22px rgba(46,180,255,0.6); }
 }
 
 .editor-preview {

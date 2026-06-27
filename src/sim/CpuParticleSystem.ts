@@ -100,13 +100,13 @@ export class CpuParticleSystem implements ParticleSystem {
     }
   }
 
-  consumeNear(x: number, y: number, radius: number, maxCount: number): number {
+  consumeNear(x: number, y: number, radius: number, maxCount: number, maxSize = Infinity): number {
     const r2 = radius * radius;
     let removed = 0;
     for (let i = this.count - 1; i >= 0 && removed < maxCount; i--) {
       const dx = this.px[i] - x;
       const dy = this.py[i] - y;
-      if (dx * dx + dy * dy <= r2) {
+      if (dx * dx + dy * dy <= r2 && this.size[i] <= maxSize) {
         this.swapRemove(i);
         removed++;
       }

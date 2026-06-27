@@ -414,7 +414,8 @@ export class Game {
       const sc = config.spawn.sizeByCount;
       const sz = sc.min + (sc.max - sc.min) / (1 + n / sc.k);
       config.spawn.size = sz;
-      for (let i = 0; i < n; i++) this.system.size[i] = sz;
+      // skip particles flagged as "big" by the condenser (size > 16 = above max normal)
+      for (let i = 0; i < n; i++) if (this.system.size[i] < 16) this.system.size[i] = sz;
     }
 
     if (this.mode === "game") {
