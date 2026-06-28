@@ -1,4 +1,4 @@
-// Title screen: apex logo + wordmark + Play (calm toy) / Journey (scored) / Sandbox / etc.
+// Title screen: apex logo + wordmark + Play / Sandbox.
 
 import { apexLogoSVG } from "./apexLogo";
 
@@ -24,10 +24,7 @@ export class TitleOverlay {
     const menu = this.el.querySelector(".title-menu") as HTMLDivElement;
     menu.append(
       this.button("▶  Play", "primary", opts.onPlay),
-      this.button("◆  Journey", "", opts.onJourney),
-      this.button("✦  Sandbox", "", opts.onSandbox),
-      this.button("◈  Collection", "", opts.onCollection),
-      this.button("☰  Progress", "", opts.onProgress)
+      this.button("✦  Sandbox", "", opts.onSandbox)
     );
     parent.appendChild(this.el);
   }
