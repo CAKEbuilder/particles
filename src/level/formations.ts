@@ -39,33 +39,38 @@ export function computeFormationSlots(
   const slots: FormationSlot[] = [];
 
   if (pattern === "atom") {
-    // Atom: a tight nucleus orbited by 3 electron shells. Each shell is a true 3D circle
-    // tilted into its own plane (evenly spread around the sphere) and spun in perspective,
-    // so electrons sweep in front of and behind the core — a proper 3D orbital look.
-    const focal = r * 2.8;
-    const nucleusR = r * 0.16;
-    // Nucleus: a small counter-tumbling cluster so the core shimmers.
-    for (let k = 0; k < 6; k++) {
-      const na = -a * 1.5 + (k / 6) * Math.PI * 2;
-      const [nx, ny, nz] = rot3(Math.cos(na) * nucleusR, Math.sin(na) * nucleusR, 0, 0.9, a * 0.8);
-      const persp = focal / (focal - nz);
-      slots.push({ x: cx + nx * persp, y: cy + ny * persp, scale: persp * 1.25, alpha: depthAlpha(nz, nucleusR) });
+    // Atom: a tight bright nucleus orbited by 3 densely-populated electron rings. Each ring
+    // is a thin ellipse (a circle seen nearly edge-on) rotated in the screen plane by
+    // 0/60/120°, with electrons orbiting along it — the iconic atom, read instantly even at
+    // a glance. Depth shading (front electrons bigger/brighter) keeps it dimensional.
+    const nucleusR = r * 0.14;
+    // Nucleus: a small bright counter-tumbling cluster so the core reads as a dense point.
+    for (let k = 0; k < 5; k++) {
+      const na = -a * 1.5 + (k / 5) * Math.PI * 2;
+      slots.push({ x: cx + Math.cos(na) * nucleusR, y: cy + Math.sin(na) * nucleusR, scale: 1.4, alpha: 1 });
     }
-    // Electron shells.
-    const perShell = 7;
-    for (let shell = 0; shell < 3; shell++) {
-      const tiltX = 1.0;                                 // lean each orbital plane
-      const tiltY = shell * ((Math.PI * 2) / 3);         // spread the 3 planes 120° apart
-      const dir = shell % 2 === 0 ? 1 : -1;              // alternate orbit direction
-      const spd = 1 + shell * 0.25;
-      for (let j = 0; j < perShell; j++) {
-        const th = dir * a * spd + (j / perShell) * Math.PI * 2;
-        const [ex, ey, ez] = rot3(Math.cos(th) * r, Math.sin(th) * r, 0, tiltX, tiltY);
-        const persp = focal / (focal - ez);
-        slots.push({ x: cx + ex * persp, y: cy + ey * persp, scale: persp, alpha: depthAlpha(ez, r) });
+    // Electron rings.
+    const perRing = 14;
+    const minor = 0.34;                                   // ellipse squash = into-screen axis
+    for (let ring = 0; ring < 3; ring++) {
+      const phi = ring * (Math.PI / 3);                   // in-plane rotation 0/60/120°
+      const cosP = Math.cos(phi), sinP = Math.sin(phi);
+      const dir = ring % 2 === 0 ? 1 : -1;                // alternate orbit direction
+      const spd = 1 + ring * 0.2;
+      for (let j = 0; j < perRing; j++) {
+        const th = dir * a * spd + (j / perRing) * Math.PI * 2;
+        const ex = Math.cos(th) * r;
+        const ey = Math.sin(th) * r * minor;
+        const depth = Math.sin(th);                       // +1 front, -1 back
+        slots.push({
+          x: cx + ex * cosP - ey * sinP,
+          y: cy + ex * sinP + ey * cosP,
+          scale: 1 + depth * 0.45,
+          alpha: depthAlpha(depth, 1),
+        });
       }
     }
-    // Total: 6 + 21 = 27
+    // Total: 5 + 42 = 47
 
   } else if (pattern === "ring") {
     // Halo: a tilted disc spun about its axis and drawn in perspective, so particles

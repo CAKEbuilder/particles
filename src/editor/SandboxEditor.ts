@@ -585,7 +585,7 @@ export class SandboxEditor {
       const r = Math.max(26, Math.hypot(x2-x1, y2-y1) * 0.55);
       item = this.createCannon(x1, y1, r, 0);
     } else if (t === "particleart-atom" || t === "particleart-ring" || t === "particleart-triangle") {
-      const r = Math.max(40, Math.hypot(x2-x1, y2-y1));
+      const r = Math.max(70, Math.hypot(x2-x1, y2-y1));
       const pattern: ParticleArtPattern = t === "particleart-atom" ? "atom" : t === "particleart-ring" ? "ring" : "triangle";
       item = this.createParticleArt(x1, y1, r, pattern);
     }
@@ -612,7 +612,7 @@ export class SandboxEditor {
     } else if (t === "cannon") {
       el.style.cssText = circleCSS(x1, y1, Math.max(26, Math.hypot(x2-x1,y2-y1)*0.55));
     } else if (t.startsWith("particleart")) {
-      el.style.cssText = circleCSS(x1, y1, Math.max(40, Math.hypot(x2-x1,y2-y1)));
+      el.style.cssText = circleCSS(x1, y1, Math.max(70, Math.hypot(x2-x1,y2-y1)));
     }
   }
 
@@ -919,7 +919,7 @@ export class SandboxEditor {
           this.updateCannonEl(item);
         }
       } else if (item.kind === "particleart") {
-        item.r = Math.max(30, (s.r ?? 60) + Math.hypot(dx, dy) * (dx + dy > 0 ? 1 : -1));
+        item.r = Math.max(70, (s.r ?? 70) + Math.hypot(dx, dy) * (dx + dy > 0 ? 1 : -1));
         item.el.style.cssText = circleCSS(item.x, item.y, item.r);
       }
     }

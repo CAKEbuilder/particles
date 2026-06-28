@@ -1432,18 +1432,15 @@ body {
 }
 
 /* ---- particle art formations ---- */
+/* The particles themselves are the visual — no enclosing ring/glyph. The selection
+   ring still appears when a formation is grabbed with Move/Resize. */
 .editor-particleart {
-  background: radial-gradient(circle, rgba(46,255,190,0.07) 40%, transparent 75%);
-  border: 1.5px dashed rgba(46,255,190,0.38);
-  box-shadow: 0 0 14px rgba(46,255,190,0.1);
-  animation: art-idle 2.4s ease-in-out infinite alternate;
-}
-@keyframes art-idle {
-  to { box-shadow: 0 0 22px rgba(46,255,190,0.22); }
+  background: none;
+  border: none;
+  box-shadow: none;
 }
 .editor-particleart .editor-effect-glyph {
-  color: rgba(80,255,210,0.82);
-  text-shadow: 0 0 14px rgba(46,255,190,0.75);
+  display: none;
 }
 
 /* Cannon toolbar button accent */
