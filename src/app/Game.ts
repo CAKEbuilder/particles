@@ -335,7 +335,7 @@ export class Game {
         this.hud.setVisible(true);
         this.hud.showAllTools();
         this.hud.resetToSpawn();
-        this.showTagline("Everything unlocked. Play freely.");
+        this.showTagline("Experiment freely.");
         break;
 
       case "game": {
