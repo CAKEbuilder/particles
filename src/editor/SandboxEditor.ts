@@ -224,9 +224,14 @@ export class SandboxEditor {
     const bar = document.createElement("div");
     bar.className = "editor-toolbar";
 
-    const group = (pairs: [string, string, string?, (() => void)?][]): void => {
+    const header = document.createElement("div");
+    header.className = "sandbox-section-header sandbox-section-header--objects";
+    header.textContent = "Objects";
+    bar.appendChild(header);
+
+    const group = (pairs: [string, string, string?, (() => void)?][], isEdit = false): void => {
       const g = document.createElement("div");
-      g.className = "editor-toolbar-group";
+      g.className = "editor-toolbar-group" + (isEdit ? " editor-toolbar-group--edit" : "");
       for (const [key, label, extraClass, onClick] of pairs) {
         const b = document.createElement("button");
         b.className = "hud-btn" + (extraClass ? " " + extraClass : "");
@@ -253,12 +258,12 @@ export class SandboxEditor {
     ]);
 
     group([
-      ["move",   "Move",   undefined,              () => this.selectTool("move")],
-      ["resize", "Resize", undefined,              () => this.selectTool("resize")],
-      ["undo",   "↺",      undefined,              () => this.undo()],
-      ["redo",   "↻",      undefined,              () => this.redo()],
-      ["delete", "🗑",     "editor-btn-gap",       () => this.deleteSelected()],
-    ]);
+      ["move",   "Move",   undefined,        () => this.selectTool("move")],
+      ["resize", "Resize", undefined,        () => this.selectTool("resize")],
+      ["undo",   "↺",      undefined,        () => this.undo()],
+      ["redo",   "↻",      undefined,        () => this.redo()],
+      ["delete", "🗑",     "editor-btn-gap", () => this.deleteSelected()],
+    ], true);
 
     this.parent.appendChild(bar);
     this.syncToolBtns();

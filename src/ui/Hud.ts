@@ -25,6 +25,7 @@ export interface HudOptions {
 export class Hud {
   private el: HTMLDivElement;
   private stats: HTMLDivElement;
+  private sectionHeader!: HTMLDivElement;
   private toolButtons = new Map<Tool, HTMLButtonElement>();
   private gravityBtn!: HTMLButtonElement;
   private tiltBtn!: HTMLButtonElement;
@@ -41,6 +42,11 @@ export class Hud {
   ) {
     this.el = document.createElement("div");
     this.el.className = "hud";
+
+    this.sectionHeader = document.createElement("div");
+    this.sectionHeader.className = "sandbox-section-header sandbox-section-header--particles hidden-ui";
+    this.sectionHeader.textContent = "Particles";
+    this.el.appendChild(this.sectionHeader);
 
     const tools = document.createElement("div");
     tools.className = "hud-group";
@@ -175,6 +181,11 @@ export class Hud {
     }
     this.gravityBtn.classList.remove("hidden-ui", "tut-hidden");
     this.tiltBtn.classList.remove("hidden-ui", "tut-hidden");
+  }
+
+  /** Show or hide the "Particles" section header (sandbox only). */
+  setSandboxMode(on: boolean): void {
+    this.sectionHeader.classList.toggle("hidden-ui", !on);
   }
 
   /** Hide/show the fps + particle count stats readout (suppressed during tutorial). */

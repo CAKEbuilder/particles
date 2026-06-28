@@ -282,6 +282,7 @@ export class Game {
     this.specials.setEnabled(mode === "game" || mode === "intro");
     this.playfield.setEnabled(mode === "game" || mode === "intro");
     this.editor.setActive(mode === "sandbox");
+    this.hud.setSandboxMode(mode === "sandbox");
     // toy is pure sensory: no economy, no obstacles, no specials (both already false above)
     if (mode !== "game" && mode !== "intro") this.powerups.clear();
     this.title.setVisible(false);

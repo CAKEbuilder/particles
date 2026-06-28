@@ -1186,6 +1186,26 @@ body {
   }
 }
 
+/* ---- sandbox section headers ---- */
+.sandbox-section-header {
+  flex: 0 0 100%;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0 0 3px;
+  pointer-events: none;
+}
+
+.sandbox-section-header--objects {
+  color: var(--accent-2);
+}
+
+.sandbox-section-header--particles {
+  color: var(--accent);
+}
+
 /* ---- sandbox editor ---- */
 .editor-toolbar {
   position: fixed;
@@ -1207,11 +1227,16 @@ body {
   gap: 4px;
   padding: 5px;
   border-radius: 12px;
-  background: rgba(14, 18, 30, 0.75);
-  border: 1px solid rgba(120, 180, 255, 0.18);
+  background: rgba(18, 10, 32, 0.82);
+  border: 1px solid rgba(176, 107, 255, 0.28);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   pointer-events: auto;
+}
+
+.editor-toolbar-group--edit {
+  background: rgba(12, 7, 22, 0.88);
+  border-color: rgba(176, 107, 255, 0.45);
 }
 
 .editor-toolbar .hud-btn {
@@ -1224,10 +1249,10 @@ body {
 }
 
 .editor-toolbar .hud-btn.active {
-  color: #061018;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #0a0318;
+  background: linear-gradient(135deg, var(--accent-2), #7b3fc4);
   border-color: transparent;
-  box-shadow: 0 0 14px rgba(46, 230, 255, 0.35);
+  box-shadow: 0 0 14px rgba(176, 107, 255, 0.45);
 }
 
 .editor-toolbar .hud-btn:disabled {
