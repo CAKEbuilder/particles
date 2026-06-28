@@ -24,6 +24,7 @@ export class CpuParticleSystem implements ParticleSystem {
   private readonly rainbowFlag: Uint8Array;
   readonly holo: Uint8Array;    // persistent holographic flag
   readonly tintT: Float32Array; // seconds of temporary rainbow-blast tint remaining
+  readonly artId: Int32Array;   // -1 = free; >= 0 = owned by a ParticleArtItem with that id
 
   hueLo = 0;
   hueHi = 1;
@@ -56,6 +57,7 @@ export class CpuParticleSystem implements ParticleSystem {
     this.rainbowFlag = new Uint8Array(capacity);
     this.holo = new Uint8Array(capacity);
     this.tintT = new Float32Array(capacity);
+    this.artId = new Int32Array(capacity).fill(-1);
     this.grid = new SpatialHash(config.separation.radius);
   }
 
@@ -88,6 +90,7 @@ export class CpuParticleSystem implements ParticleSystem {
       this.rainbowFlag[i] = this.spawnRainbow ? 1 : 0;
       this.holo[i] = 0;
       this.tintT[i] = 0;
+      this.artId[i] = -1;
     }
   }
 
@@ -182,6 +185,7 @@ export class CpuParticleSystem implements ParticleSystem {
       this.rainbowFlag[i] = this.rainbowFlag[last];
       this.holo[i] = this.holo[last];
       this.tintT[i] = this.tintT[last];
+      this.artId[i] = this.artId[last];
     }
   }
 

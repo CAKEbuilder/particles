@@ -11,9 +11,11 @@ import {
 
 // ---- types ----
 
-type DrawTool = "line" | "box" | "circle" | "triangle" | "blackhole" | "gravityfield" | "funnel" | "condenser";
+type DrawTool = "line" | "box" | "circle" | "triangle" | "blackhole" | "gravityfield" | "funnel" | "condenser"
+              | "cannon" | "particleart-atom" | "particleart-ring" | "particleart-triangle";
 type EditTool = "move" | "resize" | "delete";
 type EditorTool = DrawTool | EditTool;
+type ParticleArtPattern = "atom" | "ring" | "triangle";
 
 // collision shapes
 interface LineItem     { kind: "line";     x1: number; y1: number; x2: number; y2: number; shape: BoxShape; el: HTMLDivElement; }
@@ -25,8 +27,27 @@ interface BlackHoleItem    { kind: "blackhole";    x: number; y: number; r: numb
 interface GravityFieldItem { kind: "gravityfield"; x: number; y: number; hw: number; hh: number; angle: number; shape: BoxShape; el: HTMLDivElement; }
 interface FunnelItem       { kind: "funnel";       inX: number; inY: number; outX: number; outY: number; inR: number; el: HTMLDivElement; }
 interface CondenserItem    { kind: "condenser";    x: number; y: number; r: number; timer: number; el: HTMLDivElement; }
+// new objects
+interface CannonItem {
+  kind: "cannon";
+  x: number; y: number;
+  r: number;
+  angle: number;
+  stored: number;
+  collectTimer: number;
+  el: HTMLDivElement;
+}
+interface ParticleArtItem {
+  kind: "particleart";
+  x: number; y: number;
+  r: number;
+  pattern: ParticleArtPattern;
+  angle: number;   // current rotation state (runtime, not persisted)
+  id: number;      // matches artId values written into CpuParticleSystem.artId
+  el: HTMLDivElement;
+}
 
-type EditorItem = LineItem | BoxItem | CircleItem | TriItem | BlackHoleItem | GravityFieldItem | FunnelItem | CondenserItem;
+type EditorItem = LineItem | BoxItem | CircleItem | TriItem | BlackHoleItem | GravityFieldItem | FunnelItem | CondenserItem | CannonItem | ParticleArtItem;
 
 interface SavedItem {
   kind: EditorItem["kind"];
@@ -35,22 +56,115 @@ interface SavedItem {
   hw?: number; hh?: number;
   r?: number; angle?: number;
   inX?: number; inY?: number; outX?: number; outY?: number;
+  stored?: number;   // cannon
+  pattern?: string;  // particleart
 }
 
 const STORAGE_KEY = "particles.editor.v1";
 const MAX_HISTORY = 50;
-const BIG_PARTICLE_SIZE = 28; // condenser output — above Game.ts skip threshold (16)
-const CONDENSER_INTERVAL = 0.12; // seconds between condenser pulses
-const BH_STRENGTH = 3500;      // black hole pull px/s² at distance r
-const MASS_STRENGTH = 1800;    // mass zone radial pull px/s²
-const BIG_ATTRACT_STR = 700;   // big-particle-to-small attraction px/s²
-const BIG_ATTRACT_R = 140;     // influence radius around big particles (px)
-const BIG_THRESHOLD = 16;      // size above which a particle counts as "big" (matches Game.ts)
+const BIG_PARTICLE_SIZE = 28;
+const CONDENSER_INTERVAL = 0.12;
+const BH_STRENGTH = 3500;
+const MASS_STRENGTH = 1800;
+const BIG_ATTRACT_STR = 700;
+const BIG_ATTRACT_R = 140;
+const BIG_THRESHOLD = 16;
+
+// Cannon
+const CANNON_COLLECT_INTERVAL = 0.08; // seconds between collect ticks
+const CANNON_CONSUME_PER_TICK = 3;    // particles consumed per tick
+const CANNON_MAX_STORED = 400;
+const CANNON_BARREL_LEN = 28;         // px beyond body radius
+
+// Particle art
+const ART_SPAWN_COUNT = 24;  // orbit particles per formation
+const ART_SPRING = 15;       // spring stiffness (px·s⁻²)
+const ART_DAMP = 5;          // extra velocity damping (s⁻¹)
+const ART_ROTATION_SPEED = 0.65; // rad/s
 
 function snap(v: number, grid: number): number { return Math.round(v / grid) * grid; }
 function snapAngle(a: number, stepDeg: number): number {
   const step = stepDeg * Math.PI / 180;
   return Math.round(a / step) * step;
+}
+
+// Compute orbit target positions for one art item at its current angle
+interface Slot { x: number; y: number; }
+function computeArtSlots(item: ParticleArtItem): Slot[] {
+  const { x: cx, y: cy, r, angle: a, pattern } = item;
+  const slots: Slot[] = [];
+
+  if (pattern === "atom") {
+    // Nucleus cluster (4)
+    for (let k = 0; k < 4; k++) {
+      const na = (k / 4) * Math.PI * 2;
+      slots.push({ x: cx + Math.cos(na) * 5, y: cy + Math.sin(na) * 5 });
+    }
+    // Ring 1: nearly face-on (slight ellipse), rotates CW, 8 particles
+    for (let k = 0; k < 8; k++) {
+      const ra = a + (k / 8) * Math.PI * 2;
+      slots.push({ x: cx + Math.cos(ra) * r, y: cy + Math.sin(ra) * r * 0.94 });
+    }
+    // Ring 2: tilted ~60°, counter-rotates, 7 particles
+    for (let k = 0; k < 7; k++) {
+      const ra = -a * 0.65 + (k / 7) * Math.PI * 2;
+      slots.push({ x: cx + Math.cos(ra) * r * 0.92, y: cy + Math.sin(ra) * r * 0.46 });
+    }
+    // Ring 3: nearly edge-on, faster, 5 particles
+    for (let k = 0; k < 5; k++) {
+      const ra = a * 1.4 + (k / 5) * Math.PI * 2;
+      slots.push({ x: cx + Math.cos(ra) * r * 0.88, y: cy + Math.sin(ra) * r * 0.16 });
+    }
+    // Total: 4+8+7+5 = 24
+
+  } else if (pattern === "ring") {
+    // Outer ring: 14 particles, CW
+    for (let k = 0; k < 14; k++) {
+      const ra = a + (k / 14) * Math.PI * 2;
+      slots.push({ x: cx + Math.cos(ra) * r, y: cy + Math.sin(ra) * r });
+    }
+    // Inner ring: 10 particles, counter-rotates faster
+    for (let k = 0; k < 10; k++) {
+      const ra = -a * 1.6 + (k / 10) * Math.PI * 2;
+      slots.push({ x: cx + Math.cos(ra) * r * 0.5, y: cy + Math.sin(ra) * r * 0.5 });
+    }
+    // Total: 14+10 = 24
+
+  } else {
+    // triangle: inverted equilateral (▽) with pseudo-3D Y-axis spin
+    const zAngle = a * 0.22;       // slow Z-axis rotation
+    const yFlip = Math.cos(a);     // Y-axis flip factor (1=face-on, 0=edge-on, -1=flipped)
+    const cosZ = Math.cos(zAngle), sinZ = Math.sin(zAngle);
+
+    const rawVerts = [
+      { lx: 0,           ly: r },           // bottom
+      { lx: -r * 0.866,  ly: -r * 0.5 },   // top-left
+      { lx:  r * 0.866,  ly: -r * 0.5 },   // top-right
+    ];
+    const verts = rawVerts.map(v => ({
+      lx: (v.lx * cosZ - v.ly * sinZ) * yFlip,
+      ly:  v.lx * sinZ + v.ly * cosZ,
+    }));
+
+    // 3 vertex clusters (3 particles each) = 9
+    for (const v of verts) {
+      for (let k = 0; k < 3; k++) {
+        const na = (k / 3) * Math.PI * 2;
+        slots.push({ x: cx + v.lx + Math.cos(na) * 5 * Math.abs(yFlip), y: cy + v.ly + Math.sin(na) * 5 });
+      }
+    }
+    // 3 edges (5 particles each) = 15
+    for (let e = 0; e < 3; e++) {
+      const va = verts[e], vb = verts[(e + 1) % 3];
+      for (let k = 1; k <= 5; k++) {
+        const t = k / 6;
+        slots.push({ x: cx + va.lx + (vb.lx - va.lx) * t, y: cy + va.ly + (vb.ly - va.ly) * t });
+      }
+    }
+    // Total: 9+15 = 24
+  }
+
+  return slots;
 }
 
 // ---- class ----
@@ -73,6 +187,8 @@ export class SandboxEditor {
   private toolbar: HTMLDivElement;
   private toolBtns = new Map<string, HTMLButtonElement>();
   private selectionRing: HTMLDivElement;
+
+  private nextArtId = 0;
 
   constructor(
     private readonly parent: HTMLElement,
@@ -124,7 +240,6 @@ export class SandboxEditor {
       } else if (item.kind === "triangle") {
         resolveShape(item.shape, px, py, vx, vy, count, r);
       }
-      // other effects don't do collision
     }
   }
 
@@ -149,7 +264,6 @@ export class SandboxEditor {
         this.system.eraseNear(item.x, item.y, item.r * 0.35);
 
       } else if (item.kind === "gravityfield") {
-        // pull all particles in the zone toward the center
         const r = Math.max(item.hw, item.hh);
         const r2 = r * r;
         for (let i = 0; i < count; i++) {
@@ -183,7 +297,6 @@ export class SandboxEditor {
         item.timer += dt;
         if (item.timer < CONDENSER_INTERVAL) continue;
         item.timer = 0;
-        // count only small particles so big ones can drift out freely
         const r2 = item.r * item.r;
         let inRange = 0;
         for (let i = 0; i < count; i++) {
@@ -196,10 +309,46 @@ export class SandboxEditor {
           const newIdx = this.system.count - 1;
           if (newIdx >= 0) this.system.size[newIdx] = BIG_PARTICLE_SIZE;
         }
+
+      } else if (item.kind === "cannon") {
+        item.collectTimer += dt;
+        if (item.collectTimer >= CANNON_COLLECT_INTERVAL && item.stored < CANNON_MAX_STORED) {
+          item.collectTimer -= CANNON_COLLECT_INTERVAL;
+          const want = Math.min(CANNON_CONSUME_PER_TICK, CANNON_MAX_STORED - item.stored);
+          const got = this.system.consumeNear(item.x, item.y, item.r * 1.65, want);
+          if (got > 0) {
+            item.stored += got;
+            this.updateCannonEl(item);
+          }
+        }
+
+      } else if (item.kind === "particleart") {
+        item.angle += ART_ROTATION_SPEED * dt;
+        const slots = computeArtSlots(item);
+        const { artId } = this.system;
+        const spring = ART_SPRING * dt;
+        const damp = 1 - ART_DAMP * dt;
+
+        for (let i = 0; i < count; i++) {
+          if (artId[i] !== item.id) continue;
+
+          // Find nearest orbit slot
+          let minD2 = Infinity, minS = 0;
+          for (let s = 0; s < slots.length; s++) {
+            const sdx = slots[s].x - px[i], sdy = slots[s].y - py[i];
+            const sd2 = sdx * sdx + sdy * sdy;
+            if (sd2 < minD2) { minD2 = sd2; minS = s; }
+          }
+
+          vx[i] += (slots[minS].x - px[i]) * spring;
+          vy[i] += (slots[minS].y - py[i]) * spring;
+          vx[i] *= damp;
+          vy[i] *= damp;
+        }
       }
     }
 
-    // big particles (from condenser) attract nearby small ones
+    // Big particles (from condenser) attract nearby small ones
     const bigR2 = BIG_ATTRACT_R * BIG_ATTRACT_R;
     for (let i = 0; i < count; i++) {
       if (this.system.size[i] <= BIG_THRESHOLD) continue;
@@ -216,6 +365,55 @@ export class SandboxEditor {
         }
       }
     }
+  }
+
+  // ---- cannon ----
+
+  private updateCannonEl(item: CannonItem): void {
+    const r = item.r;
+    const totalLen = r + CANNON_BARREL_LEN;
+    const bw = Math.max(7, r * 0.26);
+    const angleDeg = item.angle * 180 / Math.PI;
+    const vb = totalLen + 12;
+
+    item.el.innerHTML = `<svg style="position:absolute;left:0;top:0;transform:translate(-50%,-50%);overflow:visible"
+      viewBox="${-vb} ${-vb} ${vb * 2} ${vb * 2}" width="${vb * 2}" height="${vb * 2}">
+      <rect x="0" y="${-bw / 2}" width="${totalLen}" height="${bw}" rx="3"
+            fill="rgba(255,140,50,0.72)" stroke="rgba(255,190,80,0.9)" stroke-width="1.5"
+            transform="rotate(${angleDeg})"/>
+      <circle cx="0" cy="0" r="${r}"
+              fill="rgba(255,90,20,0.22)" stroke="rgba(255,160,60,0.9)" stroke-width="2.5"/>
+      <text x="0" y="1" text-anchor="middle" dominant-baseline="middle"
+            fill="rgba(255,230,140,0.95)" font-size="${Math.max(13, r * 0.48)}px"
+            font-weight="800" font-family="monospace">${item.stored}</text>
+    </svg>`;
+    item.el.classList.toggle("loaded", item.stored > 0);
+  }
+
+  private fireCannon(item: CannonItem): void {
+    if (item.stored <= 0) return;
+
+    const fireCount = item.stored;
+    item.stored = 0;
+    this.updateCannonEl(item);
+
+    const totalLen = item.r + CANNON_BARREL_LEN;
+    const muzzleX = item.x + Math.cos(item.angle) * totalLen;
+    const muzzleY = item.y + Math.sin(item.angle) * totalLen;
+    const launchSpeed = Math.min(620, 260 + fireCount * 0.8);
+    const halfCone = Math.PI / 7; // ~26° half-angle
+
+    const oldCount = this.system.count;
+    this.system.spawnBurst(muzzleX, muzzleY, { count: fireCount, speed: 0, speedJitter: 0 });
+    for (let i = oldCount; i < this.system.count; i++) {
+      const scatter = (Math.random() - 0.5) * 2 * halfCone;
+      const dir = item.angle + scatter;
+      this.system.vx[i] = Math.cos(dir) * launchSpeed;
+      this.system.vy[i] = Math.sin(dir) * launchSpeed;
+    }
+
+    item.el.classList.add("firing");
+    setTimeout(() => item.el.classList.remove("firing"), 380);
   }
 
   // ---- toolbar ----
@@ -255,6 +453,21 @@ export class SandboxEditor {
       ["gravityfield", "Mass",       undefined, () => this.selectTool("gravityfield")],
       ["funnel",       "Funnel",     undefined, () => this.selectTool("funnel")],
       ["condenser",    "Condenser",  undefined, () => this.selectTool("condenser")],
+    ]);
+
+    group([
+      ["cannon", "Cannon", "editor-btn-cannon", () => this.selectTool("cannon")],
+    ]);
+
+    const particleHeader = document.createElement("div");
+    particleHeader.className = "sandbox-section-header sandbox-section-header--particles";
+    particleHeader.textContent = "◉  Particle Art";
+    bar.appendChild(particleHeader);
+
+    group([
+      ["particleart-atom",     "Atom",   undefined, () => this.selectTool("particleart-atom")],
+      ["particleart-ring",     "Halo",   undefined, () => this.selectTool("particleart-ring")],
+      ["particleart-triangle", "Tri 3D", undefined, () => this.selectTool("particleart-triangle")],
     ]);
 
     group([
@@ -329,7 +542,10 @@ export class SandboxEditor {
   }
 
   private restoreSnapshot(snapshot: SavedItem[]): void {
-    for (const item of this.items) item.el.remove();
+    for (const item of this.items) {
+      if (item.kind === "particleart") this.releaseArtParticles(item);
+      item.el.remove();
+    }
     this.items.length = 0;
     this.clearSelection();
     for (const s of snapshot) this.restoreItem(s);
@@ -394,10 +610,15 @@ export class SandboxEditor {
       this.previewEl = null;
       this.finalizeCreate(this.dragStartX, this.dragStartY, x, y);
     } else if ((this.tool === "move" || this.tool === "resize") && this.dragItemStart && this.selected) {
-      const after = this.serializeItem(this.selected);
-      if (JSON.stringify(after) !== JSON.stringify(this.dragItemStart)) {
-        this.pushHistory();
-        this.save();
+      // Tap-to-fire: short tap on cannon
+      if (this.selected.kind === "cannon" && Math.hypot(x - this.dragStartX, y - this.dragStartY) < 14) {
+        this.fireCannon(this.selected as CannonItem);
+      } else {
+        const after = this.serializeItem(this.selected);
+        if (JSON.stringify(after) !== JSON.stringify(this.dragItemStart)) {
+          this.pushHistory();
+          this.save();
+        }
       }
     }
 
@@ -457,6 +678,13 @@ export class SandboxEditor {
     } else if (t === "condenser") {
       const r = Math.max(24, Math.hypot(x2-x1, y2-y1));
       item = this.createCondenser(x1, y1, r);
+    } else if (t === "cannon") {
+      const r = Math.max(26, Math.hypot(x2-x1, y2-y1) * 0.55);
+      item = this.createCannon(x1, y1, r, 0);
+    } else if (t === "particleart-atom" || t === "particleart-ring" || t === "particleart-triangle") {
+      const r = Math.max(40, Math.hypot(x2-x1, y2-y1));
+      const pattern: ParticleArtPattern = t === "particleart-atom" ? "atom" : t === "particleart-ring" ? "ring" : "triangle";
+      item = this.createParticleArt(x1, y1, r, pattern);
     }
 
     if (item) { this.items.push(item); this.setSelected(item); }
@@ -478,6 +706,10 @@ export class SandboxEditor {
       el.style.cssText = triCSS(x1, y1, Math.hypot(x2-x1,y2-y1), 0);
     } else if (t === "funnel") {
       el.style.cssText = circleCSS(x1, y1, Math.max(24, Math.hypot(x2-x1,y2-y1)*0.28));
+    } else if (t === "cannon") {
+      el.style.cssText = circleCSS(x1, y1, Math.max(26, Math.hypot(x2-x1,y2-y1)*0.55));
+    } else if (t.startsWith("particleart")) {
+      el.style.cssText = circleCSS(x1, y1, Math.max(40, Math.hypot(x2-x1,y2-y1)));
     }
   }
 
@@ -550,6 +782,45 @@ export class SandboxEditor {
     return { kind: "condenser", x, y, r, timer: 0, el };
   }
 
+  private createCannon(x: number, y: number, r: number, angle: number): CannonItem {
+    const el = document.createElement("div");
+    el.className = "editor-cannon-wrap";
+    el.style.cssText = `position:absolute;left:${x}px;top:${y}px;pointer-events:none;`;
+    this.parent.appendChild(el);
+    const item: CannonItem = { kind: "cannon", x, y, r, angle, stored: 0, collectTimer: 0, el };
+    this.updateCannonEl(item);
+    return item;
+  }
+
+  private createParticleArt(x: number, y: number, r: number, pattern: ParticleArtPattern): ParticleArtItem {
+    const el = document.createElement("div");
+    el.className = "editor-effect editor-particleart";
+    el.style.cssText = circleCSS(x, y, r);
+    const glyph = pattern === "atom" ? "⚛" : pattern === "ring" ? "◎" : "▽";
+    el.innerHTML = `<span class="editor-effect-glyph">${glyph}</span>`;
+    this.parent.appendChild(el);
+
+    const id = this.nextArtId++;
+    const item: ParticleArtItem = { kind: "particleart", x, y, r, pattern, angle: 0, id, el };
+
+    // Spawn formation particles and tag them with this item's id
+    const oldCount = this.system.count;
+    this.system.spawnBurst(x, y, { count: ART_SPAWN_COUNT, speed: 30, speedJitter: 60 });
+    for (let i = oldCount; i < this.system.count; i++) {
+      this.system.artId[i] = id;
+    }
+
+    return item;
+  }
+
+  // Release art particles back to the normal pool (they stay in the world)
+  private releaseArtParticles(item: ParticleArtItem): void {
+    const { artId, count } = this.system;
+    for (let i = 0; i < count; i++) {
+      if (artId[i] === item.id) artId[i] = -1;
+    }
+  }
+
   // ---- selection + drag ----
 
   private setSelected(item: EditorItem): void {
@@ -584,6 +855,10 @@ export class SandboxEditor {
       this.selectionRing.style.cssText = boxCSS(item.x, item.y, item.r*2+12, item.r*2+12, 0) + base;
     } else if (item.kind === "funnel") {
       this.selectionRing.style.cssText = circleCSS(item.inX, item.inY, item.inR+8) + base;
+    } else if (item.kind === "cannon") {
+      this.selectionRing.style.cssText = circleCSS(item.x, item.y, item.r+10) + base;
+    } else if (item.kind === "particleart") {
+      this.selectionRing.style.cssText = circleCSS(item.x, item.y, item.r+12) + base;
     }
   }
 
@@ -632,6 +907,17 @@ export class SandboxEditor {
             distToSegment(x,y,item.inX,item.inY,item.outX,item.outY) < hr) {
           return { item, handle: "body" };
         }
+
+      } else if (item.kind === "cannon") {
+        if (dist(x,y,item.x,item.y) < item.r+hr) {
+          if (this.tool === "resize") {
+            return { item, handle: dist(x,y,item.x,item.y) < item.r*0.55 ? "body" : "rotate" };
+          }
+          return { item, handle: "body" };
+        }
+
+      } else if (item.kind === "particleart") {
+        if (dist(x,y,item.x,item.y) < item.r+hr) return { item, handle: "body" };
       }
     }
     return null;
@@ -670,6 +956,13 @@ export class SandboxEditor {
         const [noutX,noutY] = this.applySnapXY((s.outX??0)+dx, (s.outY??0)+dy);
         item.inX=ninX; item.inY=ninY; item.outX=noutX; item.outY=noutY;
         item.el.innerHTML = funnelHTML(item.inX, item.inY, item.outX, item.outY, item.inR);
+      } else if (item.kind === "cannon") {
+        [item.x, item.y] = this.applySnapXY((s.x??0)+dx, (s.y??0)+dy);
+        item.el.style.left = item.x + "px";
+        item.el.style.top  = item.y + "px";
+      } else if (item.kind === "particleart") {
+        [item.x, item.y] = this.applySnapXY((s.x??0)+dx, (s.y??0)+dy);
+        item.el.style.cssText = circleCSS(item.x, item.y, item.r);
       }
     } else if (this.tool === "resize") {
       if (item.kind === "line") {
@@ -703,6 +996,17 @@ export class SandboxEditor {
         else if (this.dragHandle === "p2") [item.outX,item.outY]=this.applySnapXY(x,y);
         else { item.inX=(s.inX??0)+dx; item.inY=(s.inY??0)+dy; item.outX=(s.outX??0)+dx; item.outY=(s.outY??0)+dy; }
         item.el.innerHTML = funnelHTML(item.inX, item.inY, item.outX, item.outY, item.inR);
+      } else if (item.kind === "cannon") {
+        if (this.dragHandle === "rotate") {
+          item.angle = Math.atan2(y - item.y, x - item.x);
+          this.updateCannonEl(item);
+        } else {
+          item.r = Math.max(24, (s.r ?? 40) + Math.hypot(dx, dy) * (dx + dy > 0 ? 1 : -1));
+          this.updateCannonEl(item);
+        }
+      } else if (item.kind === "particleart") {
+        item.r = Math.max(30, (s.r ?? 60) + Math.hypot(dx, dy) * (dx + dy > 0 ? 1 : -1));
+        item.el.style.cssText = circleCSS(item.x, item.y, item.r);
       }
     }
 
@@ -744,6 +1048,7 @@ export class SandboxEditor {
   private deleteSelected(): void { if (this.selected) this.removeItem(this.selected); }
 
   private removeItem(item: EditorItem): void {
+    if (item.kind === "particleart") this.releaseArtParticles(item);
     item.el.remove();
     const idx = this.items.indexOf(item);
     if (idx >= 0) this.items.splice(idx, 1);
@@ -751,8 +1056,6 @@ export class SandboxEditor {
     this.pushHistory();
     this.save();
   }
-
-
 
   // ---- persistence ----
 
@@ -764,7 +1067,9 @@ export class SandboxEditor {
     if (item.kind === "blackhole")    return { kind:"blackhole", x:item.x, y:item.y, r:item.r };
     if (item.kind === "gravityfield") return { kind:"gravityfield", x:item.x, y:item.y, hw:item.hw, hh:item.hh, angle:item.angle };
     if (item.kind === "funnel")       return { kind:"funnel", inX:item.inX, inY:item.inY, outX:item.outX, outY:item.outY, r:item.inR };
-    return { kind:"condenser", x:item.x, y:item.y, r:item.r };
+    if (item.kind === "condenser")    return { kind:"condenser", x:item.x, y:item.y, r:item.r };
+    if (item.kind === "cannon")       return { kind:"cannon", x:item.x, y:item.y, r:item.r, angle:item.angle, stored:item.stored };
+    return { kind:"particleart", x:item.x, y:item.y, r:item.r, pattern:item.pattern };
   }
 
   private restoreItem(s: SavedItem): void {
@@ -786,6 +1091,13 @@ export class SandboxEditor {
       this.items.push(this.createFunnel(s.inX,s.inY??0,s.outX??0,s.outY??0,s.r??36));
     } else if (s.kind==="condenser" && s.x!==undefined) {
       this.items.push(this.createCondenser(s.x,s.y??0,s.r??40));
+    } else if (s.kind==="cannon" && s.x!==undefined) {
+      const c = this.createCannon(s.x, s.y??0, s.r??50, s.angle??0);
+      c.stored = s.stored ?? 0;
+      this.updateCannonEl(c);
+      this.items.push(c);
+    } else if (s.kind==="particleart" && s.x!==undefined) {
+      this.items.push(this.createParticleArt(s.x, s.y??0, s.r??60, (s.pattern??"atom") as ParticleArtPattern));
     }
   }
 
