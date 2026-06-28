@@ -71,6 +71,8 @@ export class Game {
   private mode: Mode = "title";
   private visitors: Visitors | null = null;
   private editor: SandboxEditor;
+  private chromeBtn!: HTMLButtonElement;
+  private chromeHidden = false;
   private lastGovern = performance.now();
   private lastSave = performance.now();
   private portalAccum = 0; // particles teleported toward the next power-up
@@ -101,7 +103,11 @@ export class Game {
       onCollection: () => this.setMode("collection"),
       onProgress: () => this.setMode("progress"),
     });
-    this.editor = new SandboxEditor(uiRoot, canvas, this.system, this.input);
+    this.editor = new SandboxEditor(uiRoot, canvas, this.system, this.input, (x, y, intensity) => {
+      // Black hole swallowing particles → a low, soft consuming tone.
+      const w = window.innerWidth, h = window.innerHeight;
+      this.scheduler.request("erase", { pan: (x / w) * 2 - 1, register: 0.12 + (1 - y / h) * 0.18, intensity });
+    });
     this.hud = new Hud(uiRoot, this.input, this.system, this.loop, {
       onMenu: () => this.onMenuPressed(),
       onTilt: async () => {
@@ -210,6 +216,7 @@ export class Game {
     };
 
     this.visitors = new Visitors(uiRoot, this.system);
+    this.buildChromeToggle(uiRoot);
 
     this.resize();
     window.addEventListener("resize", () => this.resize());
@@ -244,8 +251,50 @@ export class Game {
     const h = window.innerHeight;
     const dpr = Math.min(window.devicePixelRatio || 1, this.device.dprCap);
     this.renderer.resize(w, h, dpr);
-    this.system.setBounds(w, h);
+    this.updatePlayBounds();
     this.playfield.relayout();
+  }
+
+  /** Inset the simulation walls to the band between the visible top/bottom UI bars, so
+   *  particles stay in the play area you can see rather than drifting under the buttons. */
+  private updatePlayBounds(): void {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    let top = 0;
+    let bottom = 0;
+    if (!this.chromeHidden) {
+      // Only full-width bars constrain the field: the sandbox toolbar (top) + the HUD (bottom).
+      const bars = document.querySelectorAll<HTMLElement>(".editor-toolbar, .hud");
+      for (const el of bars) {
+        if (el.classList.contains("hidden-ui")) continue;
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) continue;
+        if (r.top + r.height / 2 < h / 2) top = Math.max(top, r.bottom);
+        else bottom = Math.max(bottom, h - r.top);
+      }
+    }
+    const gap = 6; // small breathing room so particles don't kiss the bars
+    if (top > 0) top += gap;
+    if (bottom > 0) bottom += gap;
+    this.system.setBounds(w, h, top, bottom);
+    this.hud.setStatsTop(top);
+  }
+
+  private buildChromeToggle(uiRoot: HTMLElement): void {
+    this.chromeBtn = document.createElement("button");
+    this.chromeBtn.className = "chrome-toggle hidden-ui";
+    this.chromeBtn.title = "Hide / show controls";
+    this.chromeBtn.textContent = "⤢";
+    this.chromeBtn.addEventListener("click", () => this.toggleChrome());
+    uiRoot.appendChild(this.chromeBtn);
+  }
+
+  private toggleChrome(): void {
+    this.chromeHidden = !this.chromeHidden;
+    document.body.classList.toggle("chrome-hidden", this.chromeHidden);
+    this.chromeBtn.classList.toggle("active", this.chromeHidden);
+    this.chromeBtn.textContent = this.chromeHidden ? "⤡" : "⤢";
+    this.updatePlayBounds();
   }
 
   private onMenuPressed(): void {
@@ -317,7 +366,7 @@ export class Game {
         this.hud.setVisible(true);
         this.hud.showAllTools();
         this.hud.resetToSpawn();
-        this.hud.setStatsVisible(false);
+        this.hud.setStatsVisible(true);
         this.showTagline("No point. No goal. Just enjoy.");
         // Mark firstPlayDone so Journey mode doesn't run the old text tutorial
         if (!this.save.data.firstPlayDone) {
@@ -337,7 +386,7 @@ export class Game {
         this.hud.setVisible(true);
         this.hud.showAllTools();
         this.hud.resetToSpawn();
-        this.hud.setStatsVisible(false); // editor toolbar owns the top — avoid overlap
+        this.hud.setStatsVisible(true); // sits just under the toolbar via setStatsTop()
         this.showTagline("Experiment freely.");
         break;
 
@@ -382,6 +431,16 @@ export class Game {
         this.progress.setVisible(true);
         break;
     }
+
+    // Reset the hide-controls toggle per mode and re-fit the play area to the visible bars.
+    this.chromeHidden = false;
+    document.body.classList.remove("chrome-hidden");
+    this.chromeBtn.classList.remove("active");
+    this.chromeBtn.textContent = "⤢";
+    const showToggle = mode === "toy" || mode === "sandbox" || mode === "game";
+    this.chromeBtn.classList.toggle("hidden-ui", !showToggle);
+    this.updatePlayBounds();
+    requestAnimationFrame(() => this.updatePlayBounds());
   }
 
   private taglineEl: HTMLDivElement | null = null;

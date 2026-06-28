@@ -37,6 +37,9 @@ export class CpuParticleSystem implements ParticleSystem {
 
   private w = 1;
   private h = 1;
+  // Inset play rect — walls live here so particles stay in the visible band between UI bars.
+  private minY = 0;
+  private maxY = 1;
   private forcePoints: ForcePoint[] = [];
   private grid: SpatialHash;
   private events: SimEvent[] = [];
@@ -63,9 +66,11 @@ export class CpuParticleSystem implements ParticleSystem {
     this.grid = new SpatialHash(config.separation.radius);
   }
 
-  setBounds(w: number, h: number): void {
+  setBounds(w: number, h: number, insetTop = 0, insetBottom = 0): void {
     this.w = Math.max(1, w);
     this.h = Math.max(1, h);
+    this.minY = Math.max(0, insetTop);
+    this.maxY = Math.max(this.minY + 1, this.h - insetBottom);
   }
 
   setForcePoints(points: ForcePoint[]): void {
@@ -97,13 +102,15 @@ export class CpuParticleSystem implements ParticleSystem {
     }
   }
 
-  eraseNear(x: number, y: number, radius: number): void {
+  eraseNear(x: number, y: number, radius: number): number {
     const r2 = radius * radius;
+    let removed = 0;
     for (let i = this.count - 1; i >= 0; i--) {
       const dx = this.px[i] - x;
       const dy = this.py[i] - y;
-      if (dx * dx + dy * dy <= r2) this.swapRemove(i);
+      if (dx * dx + dy * dy <= r2) { this.swapRemove(i); removed++; }
     }
+    return removed;
   }
 
   consumeNear(x: number, y: number, radius: number, maxCount: number, maxSize = Infinity): number {
@@ -306,7 +313,7 @@ export class CpuParticleSystem implements ParticleSystem {
     perf.begin("walls");
     resolveWalls(
       px, py, vx, vy, n,
-      this.w, this.h,
+      0, this.minY, this.w, this.maxY,
       config.restitution, config.wallFriction, config.wallKick,
       this.events, 8
     );

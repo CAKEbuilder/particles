@@ -193,6 +193,11 @@ export class Hud {
     this.stats.classList.toggle("hidden-ui", !v);
   }
 
+  /** Drop the stats readout below the top UI bar (e.g. the sandbox toolbar). 0 = default. */
+  setStatsTop(px: number): void {
+    this.stats.style.top = px > 0 ? `${px}px` : "";
+  }
+
   update(fps: number, count: number): void {
     this.stats.innerHTML =
       `<span class="count">${count.toLocaleString()}</span> particles<br>${fps.toFixed(0)} fps`;

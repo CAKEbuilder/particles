@@ -28,7 +28,7 @@ interface BoxItem      { kind: "box";      x: number; y: number; hw: number; hh:
 interface CircleItem   { kind: "circle";   x: number; y: number; r: number; shape: CircleShape; el: HTMLDivElement; }
 interface TriItem      { kind: "triangle"; x: number; y: number; r: number; angle: number; shape: TriangleShape; el: HTMLDivElement; }
 // effects
-interface BlackHoleItem    { kind: "blackhole";    x: number; y: number; r: number; el: HTMLDivElement; }
+interface BlackHoleItem    { kind: "blackhole";    x: number; y: number; r: number; soundTimer: number; el: HTMLDivElement; }
 interface GravityFieldItem { kind: "gravityfield"; x: number; y: number; hw: number; hh: number; angle: number; shape: BoxShape; el: HTMLDivElement; }
 interface FunnelItem       { kind: "funnel";       inX: number; inY: number; outX: number; outY: number; inR: number; el: HTMLDivElement; }
 interface CondenserItem    { kind: "condenser";    x: number; y: number; r: number; timer: number; el: HTMLDivElement; }
@@ -70,6 +70,7 @@ const MAX_HISTORY = 50;
 const BIG_PARTICLE_SIZE = 28;
 const CONDENSER_INTERVAL = 0.12;
 const BH_STRENGTH = 3500;
+const BH_SWALLOW_INTERVAL = 0.13; // seconds between black-hole "swallow" sound triggers
 const MASS_STRENGTH = 1800;
 const BIG_ATTRACT_STR = 700;
 const BIG_ATTRACT_R = 140;
@@ -115,6 +116,7 @@ export class SandboxEditor {
     private readonly canvas: HTMLCanvasElement,
     private readonly system: CpuParticleSystem,
     private readonly input: Input,
+    private readonly onSwallow?: (x: number, y: number, intensity: number) => void,
   ) {
     this.toolbar = this.buildToolbar();
 
@@ -181,7 +183,12 @@ export class SandboxEditor {
             vy[i] += dy / d * f;
           }
         }
-        this.system.eraseNear(item.x, item.y, item.r * 0.35);
+        const swallowed = this.system.eraseNear(item.x, item.y, item.r * 0.35);
+        item.soundTimer -= dt;
+        if (swallowed > 0 && item.soundTimer <= 0) {
+          item.soundTimer = BH_SWALLOW_INTERVAL;
+          this.onSwallow?.(item.x, item.y, Math.min(1, swallowed / 6));
+        }
 
       } else if (item.kind === "gravityfield") {
         const r = Math.max(item.hw, item.hh);
@@ -656,7 +663,7 @@ export class SandboxEditor {
     el.className = "editor-effect editor-blackhole";
     el.style.cssText = circleCSS(x, y, r);
     this.parent.appendChild(el);
-    return { kind: "blackhole", x, y, r, el };
+    return { kind: "blackhole", x, y, r, soundTimer: 0, el };
   }
 
   private createGravityField(x: number, y: number, hw: number, hh: number, angle: number): GravityFieldItem {

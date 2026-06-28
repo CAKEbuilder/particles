@@ -44,7 +44,7 @@ export interface ParticleSystem {
   setForcePoints(points: ForcePoint[]): void;
 
   spawnBurst(x: number, y: number, opts: SpawnOptions): void;
-  eraseNear(x: number, y: number, radius: number): void;
+  eraseNear(x: number, y: number, radius: number): number;
   clear(): void;
 
   step(dt: number): void;

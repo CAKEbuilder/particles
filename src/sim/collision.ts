@@ -4,7 +4,9 @@ import type { SimEvent } from "./ParticleSystem";
 import type { SpatialHash } from "./SpatialHash";
 
 /**
- * Keep particles inside [0,w]x[0,h]; bounce with restitution and tangential friction.
+ * Keep particles inside [minX,maxX]x[minY,maxY]; bounce with restitution and tangential
+ * friction. The rect is inset from the canvas so particles stay in the visible play area
+ * (between the on-screen UI bars) rather than drifting under them.
  * Emits a (sampled) SimEvent on energetic bounces for the audio layer.
  */
 export function resolveWalls(
@@ -13,8 +15,10 @@ export function resolveWalls(
   vx: Float32Array,
   vy: Float32Array,
   count: number,
-  w: number,
-  h: number,
+  minX: number,
+  minY: number,
+  maxX: number,
+  maxY: number,
   restitution: number,
   friction: number,
   kick: number,
@@ -25,16 +29,16 @@ export function resolveWalls(
   for (let i = 0; i < count; i++) {
     let bounced = false;
 
-    if (px[i] < 0) {
-      px[i] = 0;
+    if (px[i] < minX) {
+      px[i] = minX;
       if (vx[i] < 0) {
         vx[i] = -vx[i] * restitution;
         if (vx[i] < kick) vx[i] = kick; // never stick: rebound at least `kick`
         vy[i] *= friction;
         bounced = true;
       }
-    } else if (px[i] > w) {
-      px[i] = w;
+    } else if (px[i] > maxX) {
+      px[i] = maxX;
       if (vx[i] > 0) {
         vx[i] = -vx[i] * restitution;
         if (vx[i] > -kick) vx[i] = -kick;
@@ -43,16 +47,16 @@ export function resolveWalls(
       }
     }
 
-    if (py[i] < 0) {
-      py[i] = 0;
+    if (py[i] < minY) {
+      py[i] = minY;
       if (vy[i] < 0) {
         vy[i] = -vy[i] * restitution;
         if (vy[i] < kick) vy[i] = kick;
         vx[i] *= friction;
         bounced = true;
       }
-    } else if (py[i] > h) {
-      py[i] = h;
+    } else if (py[i] > maxY) {
+      py[i] = maxY;
       if (vy[i] > 0) {
         vy[i] = -vy[i] * restitution;
         if (vy[i] > -kick) vy[i] = -kick;
