@@ -131,6 +131,11 @@ export const config = {
     infectPerFrame: 2,       // max new holo particles per infection pulse
     infectEvery: 0.55,       // seconds between infection pulses (wave spread)
     journeyRainbowMult: 2.0, // points multiplier for tinted particles in Journey
+    // Shape visitors (atom / halo / tetrahedron formations) — toy mode only.
+    shapeEvery: [32, 64] as [number, number], // seconds between shape visitors
+    shapeSpeed: 40,            // px/s drift across the field
+    shapeRadius: [60, 95] as [number, number], // formation radius range
+    shapeBurstSpeed: 260,      // outward pop speed when the shape breaks apart on-screen
   },
 
   // ---- sandbox editor ----

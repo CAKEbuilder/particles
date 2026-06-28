@@ -283,6 +283,7 @@ export class Game {
     this.playfield.setEnabled(mode === "game" || mode === "intro");
     this.editor.setActive(mode === "sandbox");
     this.hud.setSandboxMode(mode === "sandbox");
+    this.visitors?.releaseShapes(); // dissolve any in-flight shape visitors when modes change
     // toy is pure sensory: no economy, no obstacles, no specials (both already false above)
     if (mode !== "game" && mode !== "intro") this.powerups.clear();
     this.title.setVisible(false);
@@ -450,9 +451,10 @@ export class Game {
         this.save.data.totalPoints += bonus;
       }
     }
-    // Peaceful visitors run in toy and Journey (not sandbox/intro — less clutter)
+    // Peaceful visitors run in toy and Journey (not sandbox/intro — less clutter).
+    // Shape visitors (atom/halo/tetra formations) appear in toy only.
     if (this.mode === "toy" || this.mode === "game") {
-      this.visitors?.update(dt);
+      this.visitors?.update(dt, this.mode === "toy");
     }
     if (this.mode === "game" || this.mode === "intro") {
       this.powerups.update(dt);
