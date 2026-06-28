@@ -336,6 +336,7 @@ export class Game {
         this.hud.setVisible(true);
         this.hud.showAllTools();
         this.hud.resetToSpawn();
+        this.hud.setStatsVisible(false); // editor toolbar owns the top — avoid overlap
         this.showTagline("Experiment freely.");
         break;
 

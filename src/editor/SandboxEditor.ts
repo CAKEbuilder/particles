@@ -76,11 +76,11 @@ const CANNON_CONSUME_PER_TICK = 3;    // particles consumed per tick
 const CANNON_MAX_STORED = 400;
 const CANNON_BARREL_LEN = 28;         // px beyond body radius
 
-// Particle art
-const ART_SPAWN_COUNT = 24;  // orbit particles per formation
-const ART_SPRING = 15;       // spring stiffness (px·s⁻²)
-const ART_DAMP = 5;          // extra velocity damping (s⁻¹)
-const ART_ROTATION_SPEED = 0.65; // rad/s
+// Particle art — each particle owns a fixed slot index and is dragged along its slot's
+// (rotating) target, so the whole formation visibly orbits / tumbles in pseudo-3D.
+const ART_FOLLOW = 0.2;        // 0..1 velocity low-pass toward the slot's arrival velocity
+const ART_ROTATION_SPEED = 1.0; // rad/s base spin
+const ART_BASE_SIZE = config.spawn.size; // resting particle size (depth-scaled at runtime)
 
 function snap(v: number, grid: number): number { return Math.round(v / grid) * grid; }
 function snapAngle(a: number, stepDeg: number): number {
@@ -88,80 +88,99 @@ function snapAngle(a: number, stepDeg: number): number {
   return Math.round(a / step) * step;
 }
 
-// Compute orbit target positions for one art item at its current angle
-interface Slot { x: number; y: number; }
+// One orbit target: screen position plus a depth-driven size scale and alpha so the
+// formation reads as three-dimensional (nearer particles bigger & brighter).
+interface Slot { x: number; y: number; scale: number; alpha: number; }
+
+// Map a depth value (z, where +z is toward the viewer) in [-zMax, zMax] to a 0..1 brightness.
+function depthAlpha(z: number, zMax: number): number {
+  const t = zMax > 0 ? (z / zMax + 1) * 0.5 : 0.5; // 0 = far, 1 = near
+  return 0.45 + t * 0.55;
+}
+
+// Compute orbit target slots for one art item at its current angle.
 function computeArtSlots(item: ParticleArtItem): Slot[] {
   const { x: cx, y: cy, r, angle: a, pattern } = item;
   const slots: Slot[] = [];
 
   if (pattern === "atom") {
-    // Nucleus cluster (4)
+    // Bohr-style atom: a jittering nucleus + 3 electron rings (ellipses tilted 0/60/120°),
+    // each electron orbiting along its ring so the whole thing spins.
     for (let k = 0; k < 4; k++) {
-      const na = (k / 4) * Math.PI * 2;
-      slots.push({ x: cx + Math.cos(na) * 5, y: cy + Math.sin(na) * 5 });
+      const na = a * 2 + k * (Math.PI / 2);
+      slots.push({ x: cx + Math.cos(na) * 6, y: cy + Math.sin(na) * 6, scale: 1.15, alpha: 1 });
     }
-    // Ring 1: nearly face-on (slight ellipse), rotates CW, 8 particles
-    for (let k = 0; k < 8; k++) {
-      const ra = a + (k / 8) * Math.PI * 2;
-      slots.push({ x: cx + Math.cos(ra) * r, y: cy + Math.sin(ra) * r * 0.94 });
+    const perRing = 6;
+    for (let ring = 0; ring < 3; ring++) {
+      const phi = ring * (Math.PI / 3);            // ellipse orientation
+      const cosP = Math.cos(phi), sinP = Math.sin(phi);
+      const spd = 1 + ring * 0.4;                   // each ring a touch faster
+      for (let j = 0; j < perRing; j++) {
+        const th = a * spd + (j / perRing) * Math.PI * 2 + ring * 0.7;
+        const ex = Math.cos(th) * r;
+        const ey = Math.sin(th) * r * 0.32;         // squashed axis = into the screen
+        const depth = Math.sin(th);                 // +1 front, -1 back
+        slots.push({
+          x: cx + ex * cosP - ey * sinP,
+          y: cy + ex * sinP + ey * cosP,
+          scale: 1 + depth * 0.5,
+          alpha: depthAlpha(depth, 1),
+        });
+      }
     }
-    // Ring 2: tilted ~60°, counter-rotates, 7 particles
-    for (let k = 0; k < 7; k++) {
-      const ra = -a * 0.65 + (k / 7) * Math.PI * 2;
-      slots.push({ x: cx + Math.cos(ra) * r * 0.92, y: cy + Math.sin(ra) * r * 0.46 });
-    }
-    // Ring 3: nearly edge-on, faster, 5 particles
-    for (let k = 0; k < 5; k++) {
-      const ra = a * 1.4 + (k / 5) * Math.PI * 2;
-      slots.push({ x: cx + Math.cos(ra) * r * 0.88, y: cy + Math.sin(ra) * r * 0.16 });
-    }
-    // Total: 4+8+7+5 = 24
+    // Total: 4 + 18 = 22
 
   } else if (pattern === "ring") {
-    // Outer ring: 14 particles, CW
-    for (let k = 0; k < 14; k++) {
-      const ra = a + (k / 14) * Math.PI * 2;
-      slots.push({ x: cx + Math.cos(ra) * r, y: cy + Math.sin(ra) * r });
-    }
-    // Inner ring: 10 particles, counter-rotates faster
-    for (let k = 0; k < 10; k++) {
-      const ra = -a * 1.6 + (k / 10) * Math.PI * 2;
-      slots.push({ x: cx + Math.cos(ra) * r * 0.5, y: cy + Math.sin(ra) * r * 0.5 });
-    }
-    // Total: 14+10 = 24
+    // Halo: a tilted disc spun about its axis and drawn in perspective, so particles
+    // sweep front-to-back around the rim. Two counter-rotating rings.
+    const focal = r * 2.8;
+    const tilt = 1.15;                              // ~66° lean about the X axis
+    const cosT = Math.cos(tilt), sinT = Math.sin(tilt);
+    const addRing = (R: number, n: number, dir: number, phase: number): void => {
+      const zMax = R * sinT;
+      for (let j = 0; j < n; j++) {
+        const th = dir * a + (j / n) * Math.PI * 2 + phase;
+        const lx = Math.cos(th) * R;
+        const ly0 = Math.sin(th) * R;
+        const y = ly0 * cosT;                        // tilt about X (local z = 0)
+        const z = ly0 * sinT;
+        const persp = focal / (focal - z);
+        slots.push({ x: cx + lx * persp, y: cy + y * persp, scale: persp, alpha: depthAlpha(z, zMax) });
+      }
+    };
+    addRing(r, 16, 1, 0);
+    addRing(r * 0.55, 10, -1, 0.3);
+    // Total: 26
 
   } else {
-    // triangle: inverted equilateral (▽) with pseudo-3D Y-axis spin
-    const zAngle = a * 0.22;       // slow Z-axis rotation
-    const yFlip = Math.cos(a);     // Y-axis flip factor (1=face-on, 0=edge-on, -1=flipped)
-    const cosZ = Math.cos(zAngle), sinZ = Math.sin(zAngle);
-
-    const rawVerts = [
-      { lx: 0,           ly: r },           // bottom
-      { lx: -r * 0.866,  ly: -r * 0.5 },   // top-left
-      { lx:  r * 0.866,  ly: -r * 0.5 },   // top-right
-    ];
-    const verts = rawVerts.map(v => ({
-      lx: (v.lx * cosZ - v.ly * sinZ) * yFlip,
-      ly:  v.lx * sinZ + v.ly * cosZ,
+    // Tri 3D: a triangle outline defined in 3D, spun about the Y axis and leaned about X,
+    // projected in perspective so it tumbles like a flat sheet in space.
+    const focal = r * 3;
+    const tiltX = 0.5;
+    const cosT = Math.cos(tiltX), sinT = Math.sin(tiltX);
+    const cosA = Math.cos(a), sinA = Math.sin(a);
+    const zMax = r;                                  // generous bound for alpha mapping
+    const verts = [-Math.PI / 2, Math.PI / 6, (5 * Math.PI) / 6].map(ang => ({
+      x: Math.cos(ang) * r, y: Math.sin(ang) * r,
     }));
-
-    // 3 vertex clusters (3 particles each) = 9
-    for (const v of verts) {
-      for (let k = 0; k < 3; k++) {
-        const na = (k / 3) * Math.PI * 2;
-        slots.push({ x: cx + v.lx + Math.cos(na) * 5 * Math.abs(yFlip), y: cy + v.ly + Math.sin(na) * 5 });
-      }
-    }
-    // 3 edges (5 particles each) = 15
+    const perEdge = 8;
     for (let e = 0; e < 3; e++) {
-      const va = verts[e], vb = verts[(e + 1) % 3];
-      for (let k = 1; k <= 5; k++) {
-        const t = k / 6;
-        slots.push({ x: cx + va.lx + (vb.lx - va.lx) * t, y: cy + va.ly + (vb.ly - va.ly) * t });
+      const A = verts[e], B = verts[(e + 1) % 3];
+      for (let k = 0; k < perEdge; k++) {
+        const t = k / perEdge;
+        const lx = A.x + (B.x - A.x) * t;
+        const ly = A.y + (B.y - A.y) * t;
+        // spin about Y (local z = 0): rx = lx·cosA, rz = -lx·sinA
+        const rx = lx * cosA;
+        const rz = -lx * sinA;
+        // lean about X
+        const y = ly * cosT - rz * sinT;
+        const z = ly * sinT + rz * cosT;
+        const persp = focal / (focal - z);
+        slots.push({ x: cx + rx * persp, y: cy + y * persp, scale: persp, alpha: depthAlpha(z, zMax) });
       }
     }
-    // Total: 9+15 = 24
+    // Total: 24
   }
 
   return slots;
@@ -325,25 +344,22 @@ export class SandboxEditor {
       } else if (item.kind === "particleart") {
         item.angle += ART_ROTATION_SPEED * dt;
         const slots = computeArtSlots(item);
-        const { artId } = this.system;
-        const spring = ART_SPRING * dt;
-        const damp = 1 - ART_DAMP * dt;
+        const { artId, artSlot, size, alpha } = this.system;
+        const invDt = dt > 0 ? 1 / dt : 0;
 
         for (let i = 0; i < count; i++) {
           if (artId[i] !== item.id) continue;
+          const s = slots[artSlot[i]];
+          if (!s) continue;
 
-          // Find nearest orbit slot
-          let minD2 = Infinity, minS = 0;
-          for (let s = 0; s < slots.length; s++) {
-            const sdx = slots[s].x - px[i], sdy = slots[s].y - py[i];
-            const sd2 = sdx * sdx + sdy * sdy;
-            if (sd2 < minD2) { minD2 = sd2; minS = s; }
-          }
-
-          vx[i] += (slots[minS].x - px[i]) * spring;
-          vy[i] += (slots[minS].y - py[i]) * spring;
-          vx[i] *= damp;
-          vy[i] *= damp;
+          // Drag each particle toward the velocity it would need to reach its slot this
+          // frame; the low-pass leaves a slight trail so the motion reads as orbiting.
+          const needVx = (s.x - px[i]) * invDt;
+          const needVy = (s.y - py[i]) * invDt;
+          vx[i] += (needVx - vx[i]) * ART_FOLLOW;
+          vy[i] += (needVy - vy[i]) * ART_FOLLOW;
+          size[i] = ART_BASE_SIZE * s.scale;
+          alpha[i] = s.alpha;
         }
       }
     }
@@ -476,6 +492,7 @@ export class SandboxEditor {
       ["undo",   "↺",      undefined,        () => this.undo()],
       ["redo",   "↻",      undefined,        () => this.redo()],
       ["delete", "🗑",     "editor-btn-gap", () => this.deleteSelected()],
+      ["clear",  "Clear",  "editor-btn-danger", () => this.deleteAll()],
     ], true);
 
     this.parent.appendChild(bar);
@@ -505,8 +522,9 @@ export class SandboxEditor {
       } else if (key === "redo") {
         btn.classList.remove("active");
         btn.disabled = this.histIdx >= this.history.length - 1;
-      } else if (key === "delete") {
+      } else if (key === "delete" || key === "clear") {
         btn.classList.remove("active");
+        if (key === "clear") btn.disabled = this.items.length === 0;
       } else {
         btn.classList.toggle("active", key === this.tool);
       }
@@ -803,11 +821,13 @@ export class SandboxEditor {
     const id = this.nextArtId++;
     const item: ParticleArtItem = { kind: "particleart", x, y, r, pattern, angle: 0, id, el };
 
-    // Spawn formation particles and tag them with this item's id
+    // Spawn exactly one particle per orbit slot and tag each with this item's id + slot index.
+    const slotCount = computeArtSlots(item).length;
     const oldCount = this.system.count;
-    this.system.spawnBurst(x, y, { count: ART_SPAWN_COUNT, speed: 30, speedJitter: 60 });
+    this.system.spawnBurst(x, y, { count: slotCount, speed: 20, speedJitter: 40 });
     for (let i = oldCount; i < this.system.count; i++) {
       this.system.artId[i] = id;
+      this.system.artSlot[i] = i - oldCount;
     }
 
     return item;
@@ -815,9 +835,14 @@ export class SandboxEditor {
 
   // Release art particles back to the normal pool (they stay in the world)
   private releaseArtParticles(item: ParticleArtItem): void {
-    const { artId, count } = this.system;
+    const { artId, artSlot, size, alpha, count } = this.system;
     for (let i = 0; i < count; i++) {
-      if (artId[i] === item.id) artId[i] = -1;
+      if (artId[i] === item.id) {
+        artId[i] = -1;
+        artSlot[i] = -1;
+        size[i] = ART_BASE_SIZE;
+        alpha[i] = 1;
+      }
     }
   }
 
@@ -910,10 +935,8 @@ export class SandboxEditor {
 
       } else if (item.kind === "cannon") {
         if (dist(x,y,item.x,item.y) < item.r+hr) {
-          if (this.tool === "resize") {
-            return { item, handle: dist(x,y,item.x,item.y) < item.r*0.55 ? "body" : "rotate" };
-          }
-          return { item, handle: "body" };
+          // Inner core = body (move/resize); outer ring = aim the barrel (rotate).
+          return { item, handle: dist(x,y,item.x,item.y) < item.r*0.55 ? "body" : "rotate" };
         }
 
       } else if (item.kind === "particleart") {
@@ -957,9 +980,15 @@ export class SandboxEditor {
         item.inX=ninX; item.inY=ninY; item.outX=noutX; item.outY=noutY;
         item.el.innerHTML = funnelHTML(item.inX, item.inY, item.outX, item.outY, item.inR);
       } else if (item.kind === "cannon") {
-        [item.x, item.y] = this.applySnapXY((s.x??0)+dx, (s.y??0)+dy);
-        item.el.style.left = item.x + "px";
-        item.el.style.top  = item.y + "px";
+        if (this.dragHandle === "rotate") {
+          // Hold-drag the outer ring to re-aim the launcher.
+          item.angle = Math.atan2(y - item.y, x - item.x);
+          this.updateCannonEl(item);
+        } else {
+          [item.x, item.y] = this.applySnapXY((s.x??0)+dx, (s.y??0)+dy);
+          item.el.style.left = item.x + "px";
+          item.el.style.top  = item.y + "px";
+        }
       } else if (item.kind === "particleart") {
         [item.x, item.y] = this.applySnapXY((s.x??0)+dx, (s.y??0)+dy);
         item.el.style.cssText = circleCSS(item.x, item.y, item.r);
@@ -1046,6 +1075,18 @@ export class SandboxEditor {
   // ---- deletion ----
 
   private deleteSelected(): void { if (this.selected) this.removeItem(this.selected); }
+
+  private deleteAll(): void {
+    if (this.items.length === 0) return;
+    for (const item of this.items) {
+      if (item.kind === "particleart") this.releaseArtParticles(item);
+      item.el.remove();
+    }
+    this.items.length = 0;
+    this.clearSelection();
+    this.pushHistory();
+    this.save();
+  }
 
   private removeItem(item: EditorItem): void {
     if (item.kind === "particleart") this.releaseArtParticles(item);
