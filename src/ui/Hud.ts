@@ -56,7 +56,8 @@ export class Hud {
     this.gravityBtn = this.button("Gravity", () => this.toggleGravity());
     this.tiltBtn = this.button("Tilt", () => this.toggleTilt());
     this.pauseBtn = this.button("Pause", () => this.togglePause());
-    const clearBtn = this.button("Clear", () => this.system.clear());
+    const clearBtn = this.button("🗑", () => this.system.clear());
+    clearBtn.title = "Clear all particles";
     const menuBtn = this.button("Menu", () => this.opts.onMenu());
     actions.appendChild(this.gravityBtn);
     actions.appendChild(this.tiltBtn);

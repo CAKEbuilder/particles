@@ -1235,6 +1235,10 @@ body {
   cursor: default;
 }
 
+.editor-btn-gap {
+  margin-left: 10px;
+}
+
 .editor-item {
   background: rgba(46, 230, 255, 0.18);
   border: 1.5px solid rgba(46, 230, 255, 0.55);

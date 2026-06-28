@@ -58,7 +58,6 @@ function snapAngle(a: number, stepDeg: number): number {
 export class SandboxEditor {
   private items: EditorItem[] = [];
   private tool: EditorTool = "line";
-  private snapEnabled = true;
   private active = false;
   private selected: EditorItem | null = null;
 
@@ -225,14 +224,14 @@ export class SandboxEditor {
     const bar = document.createElement("div");
     bar.className = "editor-toolbar";
 
-    const group = (pairs: [string, string, () => void][]): void => {
+    const group = (pairs: [string, string, string?, (() => void)?][]): void => {
       const g = document.createElement("div");
       g.className = "editor-toolbar-group";
-      for (const [key, label, action] of pairs) {
+      for (const [key, label, extraClass, onClick] of pairs) {
         const b = document.createElement("button");
-        b.className = "hud-btn";
+        b.className = "hud-btn" + (extraClass ? " " + extraClass : "");
         b.textContent = label;
-        b.addEventListener("click", action);
+        if (onClick) b.addEventListener("click", onClick);
         g.appendChild(b);
         this.toolBtns.set(key, b);
       }
@@ -240,30 +239,25 @@ export class SandboxEditor {
     };
 
     group([
-      ["line",     "Line",     () => this.selectTool("line")],
-      ["box",      "Box",      () => this.selectTool("box")],
-      ["circle",   "Circle",   () => this.selectTool("circle")],
-      ["triangle", "Triangle", () => this.selectTool("triangle")],
+      ["line",     "Line",     undefined, () => this.selectTool("line")],
+      ["box",      "Box",      undefined, () => this.selectTool("box")],
+      ["circle",   "Circle",   undefined, () => this.selectTool("circle")],
+      ["triangle", "Triangle", undefined, () => this.selectTool("triangle")],
     ]);
 
     group([
-      ["blackhole",    "Black Hole", () => this.selectTool("blackhole")],
-      ["gravityfield", "Mass",       () => this.selectTool("gravityfield")],
-      ["funnel",       "Funnel",     () => this.selectTool("funnel")],
-      ["condenser",    "Condenser",  () => this.selectTool("condenser")],
+      ["blackhole",    "Black Hole", undefined, () => this.selectTool("blackhole")],
+      ["gravityfield", "Mass",       undefined, () => this.selectTool("gravityfield")],
+      ["funnel",       "Funnel",     undefined, () => this.selectTool("funnel")],
+      ["condenser",    "Condenser",  undefined, () => this.selectTool("condenser")],
     ]);
 
     group([
-      ["move",   "Move",   () => this.selectTool("move")],
-      ["resize", "Resize", () => this.selectTool("resize")],
-      ["delete", "Delete", () => this.deleteSelected()],
-    ]);
-
-    group([
-      ["snap",  "Snap ✓",  () => this.toggleSnap()],
-      ["undo",  "Undo",    () => this.undo()],
-      ["redo",  "Redo",    () => this.redo()],
-      ["clear", "Clear All", () => this.clearAll()],
+      ["move",   "Move",   undefined,              () => this.selectTool("move")],
+      ["resize", "Resize", undefined,              () => this.selectTool("resize")],
+      ["undo",   "↺",      undefined,              () => this.undo()],
+      ["redo",   "↻",      undefined,              () => this.redo()],
+      ["delete", "🗑",     "editor-btn-gap",       () => this.deleteSelected()],
     ]);
 
     this.parent.appendChild(bar);
@@ -287,26 +281,18 @@ export class SandboxEditor {
 
   private syncToolBtns(): void {
     for (const [key, btn] of this.toolBtns) {
-      if (key === "snap") {
-        btn.textContent = this.snapEnabled ? "Snap ✓" : "Snap";
-        btn.classList.toggle("active", this.snapEnabled);
-      } else if (key === "undo") {
+      if (key === "undo") {
         btn.classList.remove("active");
         btn.disabled = this.histIdx <= 0;
       } else if (key === "redo") {
         btn.classList.remove("active");
         btn.disabled = this.histIdx >= this.history.length - 1;
-      } else if (key === "clear" || key === "delete") {
+      } else if (key === "delete") {
         btn.classList.remove("active");
       } else {
         btn.classList.toggle("active", key === this.tool);
       }
     }
-  }
-
-  private toggleSnap(): void {
-    this.snapEnabled = !this.snapEnabled;
-    this.syncToolBtns();
   }
 
   private toLocal(e: PointerEvent): [number, number] {
@@ -425,15 +411,12 @@ export class SandboxEditor {
   // ---- creation ----
 
   private applySnapXY(x: number, y: number): [number, number] {
-    if (!this.snapEnabled) return [x, y];
     const g = config.editor.snapGrid;
     return [snap(x, g), snap(y, g)];
   }
 
   private lineAngle(x1: number, y1: number, x2: number, y2: number): number {
-    let a = Math.atan2(y2 - y1, x2 - x1);
-    if (this.snapEnabled) a = snapAngle(a, config.editor.snapAngleDeg);
-    return a;
+    return snapAngle(Math.atan2(y2 - y1, x2 - x1), config.editor.snapAngleDeg);
   }
 
   private finalizeCreate(x1: number, y1: number, x2: number, y2: number): void {
@@ -690,18 +673,18 @@ export class SandboxEditor {
         else { item.x1=(s.x1??0)+dx; item.y1=(s.y1??0)+dy; item.x2=(s.x2??0)+dx; item.y2=(s.y2??0)+dy; }
         this.rebuildLine(item);
       } else if (item.kind === "box") {
-        if (this.dragHandle === "rotate") { let a=Math.atan2(dy,dx); if(this.snapEnabled)a=snapAngle(a,config.editor.snapAngleDeg); item.angle=a; }
+        if (this.dragHandle === "rotate") { let a=Math.atan2(dy,dx); a=snapAngle(a,config.editor.snapAngleDeg); item.angle=a; }
         else { item.hw=Math.max(6,(s.hw??6)+(dx>0?Math.abs(dx):-Math.abs(dx))); item.hh=Math.max(6,(s.hh??6)+(dy>0?Math.abs(dy):-Math.abs(dy))); }
         this.rebuildBox(item);
       } else if (item.kind === "gravityfield") {
-        if (this.dragHandle === "rotate") { let a=Math.atan2(dy,dx); if(this.snapEnabled)a=snapAngle(a,config.editor.snapAngleDeg); item.angle=a; }
+        if (this.dragHandle === "rotate") { let a=Math.atan2(dy,dx); a=snapAngle(a,config.editor.snapAngleDeg); item.angle=a; }
         else { item.hw=Math.max(20,(s.hw??20)+(dx>0?Math.abs(dx):-Math.abs(dx))); item.hh=Math.max(20,(s.hh??20)+(dy>0?Math.abs(dy):-Math.abs(dy))); }
         this.rebuildGravityField(item);
       } else if (item.kind === "circle") {
         item.r=Math.max(8,(s.r??8)+Math.hypot(dx,dy)*(dx+dy>0?1:-1));
         this.rebuildCircle(item);
       } else if (item.kind === "triangle") {
-        if (this.dragHandle === "rotate") { let a=Math.atan2(dy,dx); if(this.snapEnabled)a=snapAngle(a,config.editor.snapAngleDeg); item.angle=a; }
+        if (this.dragHandle === "rotate") { let a=Math.atan2(dy,dx); a=snapAngle(a,config.editor.snapAngleDeg); item.angle=a; }
         else item.r=Math.max(12,(s.r??12)+Math.hypot(dx,dy)*(dx+dy>0?1:-1));
         this.rebuildTriangle(item);
       } else if (item.kind === "blackhole") {
@@ -764,13 +747,7 @@ export class SandboxEditor {
     this.save();
   }
 
-  private clearAll(): void {
-    for (const item of this.items) item.el.remove();
-    this.items.length = 0;
-    this.clearSelection();
-    this.pushHistory();
-    this.save();
-  }
+
 
   // ---- persistence ----
 
