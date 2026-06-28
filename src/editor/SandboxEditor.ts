@@ -226,7 +226,7 @@ export class SandboxEditor {
 
     const header = document.createElement("div");
     header.className = "sandbox-section-header sandbox-section-header--objects";
-    header.textContent = "Objects";
+    header.textContent = "◈  Objects";
     bar.appendChild(header);
 
     const group = (pairs: [string, string, string?, (() => void)?][], isEdit = false): void => {

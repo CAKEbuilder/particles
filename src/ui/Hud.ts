@@ -45,7 +45,7 @@ export class Hud {
 
     this.sectionHeader = document.createElement("div");
     this.sectionHeader.className = "sandbox-section-header sandbox-section-header--particles hidden-ui";
-    this.sectionHeader.textContent = "Particles";
+    this.sectionHeader.textContent = "◉  Particles";
     this.el.appendChild(this.sectionHeader);
 
     const tools = document.createElement("div");

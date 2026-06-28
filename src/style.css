@@ -62,25 +62,27 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  padding: max(12px, env(safe-area-inset-bottom)) 12px calc(12px + env(safe-area-inset-bottom));
+  padding: 0 10px calc(10px + env(safe-area-inset-bottom));
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   pointer-events: none;
   user-select: none;
+  background: rgba(3, 10, 18, 0.96);
+  border-top: 2px solid rgba(46, 230, 255, 0.5);
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
 }
 
 .hud-group {
   display: flex;
-  gap: 6px;
-  padding: 6px;
-  border-radius: 14px;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  backdrop-filter: blur(10px) saturate(1.2);
-  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  gap: 5px;
+  padding: 5px;
+  border-radius: 12px;
+  background: rgba(46, 230, 255, 0.05);
+  border: 1px solid rgba(46, 230, 255, 0.15);
   pointer-events: auto;
 }
 
@@ -140,20 +142,21 @@ body {
 .hud-stats {
   position: fixed;
   top: max(10px, env(safe-area-inset-top));
-  left: 12px;
+  right: 14px;
+  text-align: right;
   font-variant-numeric: tabular-nums;
-  font-size: 14px;
-  color: var(--text);
+  font-size: 13px;
+  color: rgba(207, 227, 255, 0.6);
   pointer-events: none;
   user-select: none;
   line-height: 1.55;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
+  z-index: 6;
 }
 
 .hud-stats .count {
   color: var(--accent);
   font-weight: 800;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 /* hero slot (top-centre): swarm counter + pts/s */
@@ -1190,73 +1193,86 @@ body {
 .sandbox-section-header {
   flex: 0 0 100%;
   text-align: center;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  padding: 0 0 3px;
   pointer-events: none;
 }
 
 .sandbox-section-header--objects {
   color: var(--accent-2);
+  padding: max(8px, env(safe-area-inset-top)) 0 8px;
+  border-bottom: 1px solid rgba(176, 107, 255, 0.25);
+  margin-bottom: 4px;
 }
 
 .sandbox-section-header--particles {
   color: var(--accent);
+  padding: 8px 0 4px;
+  border-bottom: 1px solid rgba(46, 230, 255, 0.2);
+  margin-bottom: 2px;
 }
 
-/* ---- sandbox editor ---- */
+/* ---- sandbox editor (Objects panel) ---- */
 .editor-toolbar {
   position: fixed;
   left: 0;
   right: 0;
-  top: max(10px, env(safe-area-inset-top));
+  top: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 12px;
+  gap: 5px;
+  padding: 0 10px 10px;
   pointer-events: none;
   z-index: 5;
+  background: rgba(10, 4, 20, 0.96);
+  border-bottom: 2px solid rgba(176, 107, 255, 0.55);
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
 }
 
 .editor-toolbar-group {
   display: flex;
   gap: 4px;
-  padding: 5px;
-  border-radius: 12px;
-  background: rgba(18, 10, 32, 0.82);
-  border: 1px solid rgba(176, 107, 255, 0.28);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(176, 107, 255, 0.07);
+  border: 1px solid rgba(176, 107, 255, 0.2);
   pointer-events: auto;
 }
 
 .editor-toolbar-group--edit {
-  background: rgba(12, 7, 22, 0.88);
-  border-color: rgba(176, 107, 255, 0.45);
+  background: rgba(176, 107, 255, 0.12);
+  border-color: rgba(176, 107, 255, 0.38);
 }
 
 .editor-toolbar .hud-btn {
   font-size: 12px;
   padding: 7px 10px;
   min-width: 40px;
-  min-height: 34px;
+  min-height: 36px;
   background: transparent;
   border-color: transparent;
+  color: rgba(207, 175, 255, 0.75);
+}
+
+.editor-toolbar .hud-btn:hover {
+  color: var(--accent-2);
+  background: rgba(176, 107, 255, 0.1);
 }
 
 .editor-toolbar .hud-btn.active {
   color: #0a0318;
   background: linear-gradient(135deg, var(--accent-2), #7b3fc4);
   border-color: transparent;
-  box-shadow: 0 0 14px rgba(176, 107, 255, 0.45);
+  box-shadow: 0 0 12px rgba(176, 107, 255, 0.5);
 }
 
 .editor-toolbar .hud-btn:disabled {
-  opacity: 0.3;
+  opacity: 0.25;
   cursor: default;
 }
 
